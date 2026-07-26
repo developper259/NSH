@@ -1,0 +1,34 @@
+.nsh-highlighter {
+  background-color: #ffffff;
+  color: #000000;
+}
+
+.nsh-keyword {
+  color: #0000ff;
+  font-weight: bold;
+}
+
+.nsh-string {
+  color: #a31515;
+}
+
+.nsh-number {
+  color: #098658;
+}
+
+.nsh-comment {
+  color: #008000;
+  font-style: italic;
+}
+
+.nsh-function {
+  color: #795e26;
+}
+
+.nsh-variable {
+  color: #001080;
+}
+
+.nsh-operator {
+  color: #000000;
+}
