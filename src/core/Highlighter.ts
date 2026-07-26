@@ -24,6 +24,15 @@ export class Highlighter {
     };
   }
 
+  public getToken(code: string): Token[] {
+    return this.tokenizer.tokenize(code);
+  }
+
+  public getHTML(code: string): string {
+    const tokens = this.tokenizer.tokenize(code);
+    return this.generateHTML(code, tokens);
+  }
+
   public setTheme(themeName: string): void {
     this.themeName = themeName;
   }

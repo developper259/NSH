@@ -28,7 +28,6 @@ export class ThemeManager {
   }
 
   private loadBuiltinThemes(): void {
-    this.registerTheme('default', './themes/css/default.css');
     this.registerTheme('light', './themes/css/light.css');
     this.registerTheme('dark', './themes/css/dark.css');
   }

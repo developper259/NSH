@@ -10,7 +10,7 @@
     "build": "tsc",
     "dev": "tsc --watch",
     "start": "tsc && node dist/index.js",
-    "socket": "tsc && node dist/core/Socket.js"
+    "socket": "tsc && node test/index.js"
   },
   "dependencies": {
     "typescript": "^7.0.2",

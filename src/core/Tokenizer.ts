@@ -1,4 +1,4 @@
-import { Token, TokenType } from '../types/token';
+import { Token } from '../types/token';
 import { LanguageDefinition } from '../types/language';
 
 export class Tokenizer {

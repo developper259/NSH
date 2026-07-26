@@ -1,44 +1,45 @@
 import { WebSocketServer, WebSocket } from 'ws';
 
 import { Highlighter } from './Highlighter';
-import { LanguageDefinition } from '../types/language';
-import { HighlightOptions } from '../types/highlighter';
-import { JavaScript } from '../languages/JavaScript';
-import { TypeScript } from '../languages/TypeScript';
-import { Python } from '../languages/Python';
-import { HTML } from '../languages/HTML';
-import { CSS } from '../languages/CSS';
+import { languages } from '../languages/Languages'; 
+import { HighlightRequest, HighlightResponse } from '../types/socket';
 
-interface HighlightRequest {
-  id: string;
-  code: string;
-  language: string;
-  options?: HighlightOptions;
-}
+export class NSHServer {
+  private port: number;
+  private wss: WebSocketServer | null = null;
 
-interface HighlightResponse {
-  id: string;
-  success: boolean;
-  html?: string;
-  error?: string;
-}
+  constructor(port: number = 8080) {
+    this.port = port;
+  }
 
-const languages: Record<string, LanguageDefinition> = {
-  javascript: new JavaScript(),
-  typescript: new TypeScript(),
-  python: new Python(),
-  html: new HTML(),
-  css: new CSS()
-};
+  public start(): void {
+    if (this.wss) {
+      console.warn(`Le serveur NSH est déjà en cours d'exécution sur le port ${this.port}`);
+      return;
+    }
 
-const wss = new WebSocketServer({ port: 8080 });
+    this.wss = new WebSocketServer({ port: this.port });
+    console.log(`NSH Socket Server démarré sur ws://localhost:${this.port}`);
 
-console.log('NSH Socket Server démarré sur ws://localhost:8080');
+    this.wss.on('connection', (ws: WebSocket) => this.handleConnection(ws));
+  }
 
-wss.on('connection', (ws: WebSocket) => {
-  console.log('Nouveau client connecté');
+  public stop(): void {
+    if (this.wss) {
+      this.wss.close(() => {
+        console.log('NSH Socket Server arrêté.');
+      });
+      this.wss = null;
+    }
+  }
 
-  ws.on('message', (message: string) => {
+  private handleConnection(ws: WebSocket): void {
+    console.log('Nouveau client connecté');
+    ws.on('message', (message: string) => this.handleMessage(ws, message));
+    ws.on('close', () => console.log('Client déconnecté'));
+  }
+
+  private handleMessage(ws: WebSocket, message: string): void {
     let request: HighlightRequest;
 
     try {
@@ -56,13 +57,26 @@ wss.on('connection', (ws: WebSocket) => {
       }
 
       const highlighter = new Highlighter(languageDef, request.options);
-      const result = highlighter.highlight(request.code);
-
+      
+      const responseType = request.responseType || 'html';
       const response: HighlightResponse = {
         id: request.id,
-        success: true,
-        html: result.html
+        success: true
       };
+
+      if (responseType === 'html') {
+        response.html = highlighter.getHTML(request.code);
+      }
+
+      if (responseType === 'tokens') {
+        response.tokens = highlighter.getToken(request.code);
+      }
+
+      if (responseType === 'both') {
+        const result = highlighter.highlight(request.code);
+        response.html = result.html;
+        response.tokens = result.tokens;
+      }
 
       ws.send(JSON.stringify(response));
 
@@ -74,9 +88,5 @@ wss.on('connection', (ws: WebSocket) => {
       };
       ws.send(JSON.stringify(errorResponse));
     }
-  });
-
-  ws.on('close', () => {
-    console.log('Client déconnecté');
-  });
-});
+  }
+}
