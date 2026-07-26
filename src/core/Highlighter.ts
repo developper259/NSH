@@ -89,6 +89,7 @@ export class Highlighter {
 
   private getCssClass(tokenType: string): string {
     const classMap: { [key: string]: string } = {
+      // Types de base
       keyword: 'nsh-keyword',
       string: 'nsh-string',
       number: 'nsh-number',
@@ -96,15 +97,64 @@ export class Highlighter {
       function: 'nsh-function',
       variable: 'nsh-variable',
       operator: 'nsh-operator',
+      bracket: 'nsh-bracket',
+      
+      // JavaScript/TypeScript spécifiques
+      builtin: 'nsh-function',
+      'template-expression': 'nsh-variable',
+      regex: 'nsh-string',
+      'arrow-function': 'nsh-operator',
+      spread: 'nsh-operator',
+      type: 'nsh-keyword',
+      jsdoc: 'nsh-comment',
+      'type-annotation': 'nsh-keyword',
+      generic: 'nsh-keyword',
+      'non-null': 'nsh-operator',
+      'optional-chaining': 'nsh-operator',
+      'jsx-tag': 'nsh-keyword',
+      
+      // Python spécifiques
+      decorator: 'nsh-function',
+      'fstring-expression': 'nsh-variable',
+      docstring: 'nsh-comment',
+      'type-hint': 'nsh-keyword',
+      comparison: 'nsh-operator',
+      assignment: 'nsh-operator',
+      identity: 'nsh-operator',
+      membership: 'nsh-operator',
+      boolean: 'nsh-operator',
+      walrus: 'nsh-operator',
+      'special-variable': 'nsh-variable',
+      
+      // HTML spécifiques
       tag: 'nsh-keyword',
+      doctype: 'nsh-keyword',
+      'tag-open': 'nsh-keyword',
+      'tag-close': 'nsh-keyword',
+      'tag-selfclose': 'nsh-keyword',
+      'tag-bracket': 'nsh-keyword',
       attribute: 'nsh-variable',
+      'attribute-value': 'nsh-string',
+      cdata: 'nsh-string',
+      'processing-instruction': 'nsh-comment',
+      'script-content': 'nsh-string',
+      'style-content': 'nsh-string',
+      entity: 'nsh-number',
+      
+      // CSS spécifiques
       selector: 'nsh-function',
+      'selector-id': 'nsh-function',
+      'selector-class': 'nsh-function',
+      'selector-attribute': 'nsh-variable',
+      'pseudo-class': 'nsh-keyword',
+      'pseudo-element': 'nsh-keyword',
       property: 'nsh-keyword',
       value: 'nsh-string',
-      decorator: 'nsh-function',
-      type: 'nsh-keyword',
-      doctype: 'nsh-keyword',
-      entity: 'nsh-number'
+      color: 'nsh-number',
+      'var-function': 'nsh-variable',
+      'at-rule': 'nsh-keyword',
+      important: 'nsh-keyword',
+      combinator: 'nsh-operator'
     };
 
     return classMap[tokenType] || 'nsh-variable';

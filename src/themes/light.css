@@ -32,3 +32,8 @@
 .nsh-operator {
   color: #000000;
 }
+
+.nsh-bracket {
+  color: #ff6600;
+  font-weight: bold;
+}
