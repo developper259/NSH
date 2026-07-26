@@ -9,9 +9,14 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
-    "start": "tsc && node dist/index.js"
+    "start": "tsc && node dist/index.js",
+    "socket": "tsc && node dist/core/Socket.js"
   },
   "dependencies": {
-    "typescript": "^7.0.2"
+    "typescript": "^7.0.2",
+    "ws": "^8.21.1"
+  },
+  "devDependencies": {
+    "@types/ws": "^8.18.1"
   }
 }
