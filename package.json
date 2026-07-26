@@ -1,0 +1,17 @@
+{
+  "name": "nsh",
+  "version": "1.0.0",
+  "description": "NSH (NDL Syntax Highlighter)",
+  "license": "ISC",
+  "author": "",
+  "type": "commonjs",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "start": "tsc && node dist/index.js"
+  },
+  "dependencies": {
+    "typescript": "^7.0.2"
+  }
+}
