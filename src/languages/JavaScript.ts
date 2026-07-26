@@ -148,10 +148,16 @@ export class JavaScript implements LanguageDefinition {
       pattern: /=>/g,
       className: 'nsh-operator'
     },
-    // Operators
+    // Brackets (avant operator pour éviter conflit avec < >)
+    {
+      name: 'bracket',
+      pattern: /[\[\]\{\}\(\)]/g,
+      className: 'nsh-bracket'
+    },
+    // Operators (sans < > car ils sont capturés par brackets)
     {
       name: 'operator',
-      pattern: /[+\-*/%=<>!&|^~?:;,.]/g,
+      pattern: /[+\-*/%=!&|^~?:;,.]/g,
       className: 'nsh-operator'
     },
     // Spread operator
@@ -162,12 +168,6 @@ export class JavaScript implements LanguageDefinition {
     },
     // Variables
     createVariableToken(),
-    // Brackets
-    {
-      name: 'bracket',
-      pattern: /[\[\]\{\}\(\)]/g,
-      className: 'nsh-bracket'
-    },
     // JSX (for .jsx files)
     {
       name: 'jsx-tag',

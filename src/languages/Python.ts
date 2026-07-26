@@ -193,11 +193,17 @@ export class Python implements LanguageDefinition {
       pattern: /\b(self|cls)\b/g,
       className: 'nsh-variable'
     },
-    // Brackets
+    // Brackets (avant operator pour éviter conflit)
     {
       name: 'bracket',
       pattern: /[\[\]\{\}\(\)]/g,
       className: 'nsh-bracket'
+    },
+    // Operators (sans < > car ils sont capturés par brackets)
+    {
+      name: 'operator',
+      pattern: /[+\-*/%=!&|^~?:;,.]/g,
+      className: 'nsh-operator'
     }
   ];
 
