@@ -1,11 +1,13 @@
 .nsh-highlighter {
-  background-color: #ffffff;
   color: #000000;
 }
 
 .nsh-keyword {
   color: #0000ff;
-  font-weight: bold;
+}
+
+.nsh-control {
+  color: #af00db;
 }
 
 .nsh-string {
@@ -29,11 +31,34 @@
   color: #001080;
 }
 
+.nsh-property {
+  color: #001080;
+}
+
+.nsh-type {
+  color: #267f99;
+}
+
+.nsh-builtin {
+  color: #0070c1;
+}
+
 .nsh-operator {
   color: #000000;
 }
 
 .nsh-bracket {
-  color: #ff6600;
-  font-weight: bold;
+  color: #000000;
+}
+
+.nsh-regex {
+  color: #811f3f;
+}
+
+.nsh-tag {
+  color: #800000;
+}
+
+.nsh-attribute {
+  color: #ff0000;
 }

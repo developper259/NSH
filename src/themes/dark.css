@@ -1,38 +1,64 @@
 .nsh-highlighter {
-  background-color: #282c34;
-  color: #abb2bf;
+  color: #d4d4d4;
 }
 
 .nsh-keyword {
-  color: #c678dd;
+  color: #569cd6;
+}
+
+.nsh-control {
+  color: #c586c0;
 }
 
 .nsh-string {
-  color: #98c379;
+  color: #ce9178;
 }
 
 .nsh-number {
-  color: #d19a66;
+  color: #b5cea8;
 }
 
 .nsh-comment {
-  color: #5c6370;
+  color: #6a9955;
   font-style: italic;
 }
 
 .nsh-function {
-  color: #61afef;
+  color: #dcdcaa;
 }
 
 .nsh-variable {
-  color: #e06c75;
+  color: #9cdcfe;
+}
+
+.nsh-property {
+  color: #9cdcfe;
+}
+
+.nsh-type {
+  color: #4ec9b0;
+}
+
+.nsh-builtin {
+  color: #4fc1ff;
 }
 
 .nsh-operator {
-  color: #56b6c2;
+  color: #d4d4d4;
 }
 
 .nsh-bracket {
-  color: #e5c07b;
-  font-weight: bold;
+  color: #d4d4d4;
+}
+
+.nsh-regex {
+  color: #d16969;
+}
+
+.nsh-tag {
+  color: #569cd6;
+}
+
+.nsh-attribute {
+  color: #9cdcfe;
 }
