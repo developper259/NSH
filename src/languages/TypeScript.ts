@@ -150,16 +150,16 @@ export class TypeScript implements LanguageDefinition {
       pattern: /=>/g,
       className: 'nsh-operator'
     },
-    // Brackets (avant operator pour éviter conflit avec < >)
+    // Brackets 
     {
       name: 'bracket',
       pattern: /[\[\]\{\}\(\)]/g,
       className: 'nsh-bracket'
     },
-    // Operators (sans < > car ils sont capturés par brackets)
+    // Operators 
     {
       name: 'operator',
-      pattern: /[+\-*/%=!&|^~?:;,.]/g,
+      pattern: /[+\-*/%=<>!&|^~?:;,.]/g,
       className: 'nsh-operator'
     },
     // Spread operator
