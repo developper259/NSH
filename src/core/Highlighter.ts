@@ -2,6 +2,7 @@ import { Token } from '../types/token';
 import { HighlightOptions, HighlightResult } from '../types/highlighter';
 import { Tokenizer } from './Tokenizer';
 import { LanguageDefinition } from '../types/language';
+import { languages } from '../languages/Languages'
 
 export class Highlighter {
   private tokenizer: Tokenizer;
@@ -12,6 +13,24 @@ export class Highlighter {
     this.tokenizer = new Tokenizer(language);
     this.themeName = options?.theme || 'dark';
     this.options = options || {};
+  }
+
+  public static getSupportedLanguages(): string[] {
+    return Object.keys(languages);
+  }
+
+  public static detectLanguage(extension: string): string | undefined {
+    const ext = extension.startsWith('.') ? extension.toLowerCase() : `.${extension.toLowerCase()}`;
+
+    for (const langKey in languages) {
+      const lang = languages[langKey];
+      
+      if (lang.extensions && lang.extensions.map(e => e.toLowerCase()).includes(ext)) {
+        return lang.name;
+      }
+    }
+
+    return undefined;
   }
 
   public highlight(code: string): HighlightResult {
