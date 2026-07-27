@@ -70,6 +70,10 @@ export class NSHServer {
 
       if (responseType === 'tokens') {
         response.tokens = highlighter.getToken(request.code);
+
+        if (request.options?.includeClasses) {
+          response.tokens = highlighter.replaceByClasses(response.tokens);
+        }
       }
 
       if (responseType === 'both') {

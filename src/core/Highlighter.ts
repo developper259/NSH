@@ -10,18 +10,29 @@ export class Highlighter {
 
   constructor(language: LanguageDefinition, options?: HighlightOptions) {
     this.tokenizer = new Tokenizer(language);
-    this.themeName = options?.theme || 'default';
+    this.themeName = options?.theme || 'dark';
     this.options = options || {};
   }
 
   public highlight(code: string): HighlightResult {
-    const tokens = this.tokenizer.tokenize(code);
+    let tokens = this.tokenizer.tokenize(code);
     const html = this.generateHTML(code, tokens);
+
+    if (this.options.includeClasses) {
+      tokens = this.replaceByClasses(tokens);
+    }
 
     return {
       html,
       tokens
     };
+  }
+
+  public replaceByClasses(tokens: Token[]): Token[] {
+    for (const token of tokens) {
+      token.type = this.getCssClass(token.type);
+    }
+    return tokens;
   }
 
   public getToken(code: string): Token[] {
