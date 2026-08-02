@@ -1,54 +1,60 @@
-import { LanguageDefinition } from '../types/language';
+import { LanguageDefinition } from "../types/language";
+import { TokenType } from "../types/token";
 import {
   createKeywordToken,
   createStringToken,
   createNumberToken,
   STRING_PATTERNS,
-  NUMBER_PATTERNS
-} from './shared';
+  NUMBER_PATTERNS,
+} from "./shared";
 
 export class Json implements LanguageDefinition {
-  name = 'json';
-  extensions = ['.json', '.geojson', '.eslintrc', '.prettierrc', '.babelrc', '.lock'];
+  name = "json";
+  extensions = [
+    ".json",
+    ".geojson",
+    ".eslintrc",
+    ".prettierrc",
+    ".babelrc",
+    ".lock",
+  ];
 
-  private jsonConstants = ['true', 'false', 'null'];
+  private jsonConstants = ["true", "false", "null"];
 
-  tokenTypes = [
+  public tokenTypes: TokenType[] = [
     {
-      name: 'json-key',
+      name: "json-key",
       pattern: /"([^"\\]|\\.)*"(?=\s*:)/g,
-      className: 'nsh-variable'
+      className: "nsh-variable",
     },
-
     createKeywordToken(this.jsonConstants),
-    
     createStringToken([STRING_PATTERNS.doubleQuote]),
-    
     createNumberToken([
       NUMBER_PATTERNS.integer,
       NUMBER_PATTERNS.decimal,
-      NUMBER_PATTERNS.scientific
+      NUMBER_PATTERNS.scientific,
     ]),
-    
     {
-      name: 'bracket',
+      name: "bracket",
       pattern: /[\[\]\{\}]/g,
-      className: 'nsh-bracket'
+      className: "nsh-bracket",
     },
-    
     {
-      name: 'operator',
+      name: "operator",
       pattern: /[:\,]/g,
-      className: 'nsh-operator'
-    }
+      className: "nsh-operator",
+    },
   ];
 
-  strings = {
-    startEnd: ['"'],
-    escapeChar: '\\'
-  };
-
-  public getTokenTypes(): any[] {
+  public getTokenTypes(): TokenType[] {
     return this.tokenTypes;
   }
+
+  public getStates(): Record<string, TokenType[]> {
+    return {
+      root: this.tokenTypes,
+    };
+  }
+
+  strings = { startEnd: ['"'], escapeChar: "\\" };
 }
