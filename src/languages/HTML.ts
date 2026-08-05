@@ -1,5 +1,8 @@
 import { LanguageDefinition } from "../types/language";
 import { TokenType } from "../types/token";
+import { JavaScript } from "./JavaScript";
+import { CSS } from "./CSS";
+import { createEmbeddedStates } from "../utils/EmbedLanguage";
 import {
   createStringToken,
   STRING_PATTERNS,
@@ -11,32 +14,40 @@ export class HTML implements LanguageDefinition {
   name = "html";
   extensions = [".html", ".htm"];
 
+  private js = new JavaScript();
+  private css = new CSS();
+
   public tokenTypes: TokenType[] = [
     { name: "doctype", pattern: /<!DOCTYPE[^>]*>/gi, className: "nsh-keyword" },
     {
       name: "tag-open",
-      pattern: /<[a-zA-Z][a-zA-Z0-9]*/g,
+      pattern: /<[a-zA-Z0-9_-]+/g,
       className: "nsh-keyword",
     },
     {
       name: "tag-close",
-      pattern: /<\/[a-zA-Z][a-zA-Z0-9]*/g,
+      pattern: /<\/[a-zA-Z0-9_-]+/g,
       className: "nsh-keyword",
     },
     { name: "tag-selfclose", pattern: /\/>/g, className: "nsh-keyword" },
     { name: "tag-bracket", pattern: />/g, className: "nsh-keyword" },
-    {
-      name: "attribute",
-      pattern: /\s[a-zA-Z-]+(?==)/g,
-      className: "nsh-variable",
-    },
     createStringToken([
       STRING_PATTERNS.doubleQuote,
       STRING_PATTERNS.singleQuote,
     ]),
     {
+      name: "attribute",
+      pattern: /[a-zA-Z0-9_-]+(?=\s*=)/g,
+      className: "nsh-variable",
+    },
+    {
+      name: "operator",
+      pattern: /=/g,
+      className: "nsh-operator",
+    },
+    {
       name: "attribute-value",
-      pattern: /=\s*[^\s"'>]+/g,
+      pattern: /[^\s"'>]+/g,
       className: "nsh-string",
     },
     createCommentToken(COMMENT_PATTERNS.multiLine.dashDash),
@@ -51,16 +62,6 @@ export class HTML implements LanguageDefinition {
       pattern: /<\?[\s\S]*?\?>/g,
       className: "nsh-comment",
     },
-    {
-      name: "script-content",
-      pattern: /<script[^>]*>[\s\S]*?<\/script>/gi,
-      className: "nsh-string",
-    },
-    {
-      name: "style-content",
-      pattern: /<style[^>]*>[\s\S]*?<\/style>/gi,
-      className: "nsh-string",
-    },
   ];
 
   public getTokenTypes(): TokenType[] {
@@ -68,6 +69,52 @@ export class HTML implements LanguageDefinition {
   }
 
   public getStates(): Record<string, TokenType[]> {
+    // Génération des états JavaScript isolés (JS dans <script>)
+    const jsStates = createEmbeddedStates({
+      language: this.js,
+      exitRule: {
+        name: "script-end",
+        pattern: /<\/script\s*>/gi,
+        className: "nsh-keyword",
+      },
+      prefix: "js_",
+    });
+
+    // Génération des états CSS isolés (CSS dans <style>)
+    const cssStates = createEmbeddedStates({
+      language: this.css,
+      exitRule: {
+        name: "style-end",
+        pattern: /<\/style\s*>/gi,
+        className: "nsh-keyword",
+      },
+      prefix: "css_",
+    });
+
+    // Ordre strict des règles pour les attributs de balises
+    // (Les chaînes de caractères DOIVENT passer en premier)
+    const tagAttributeRules: TokenType[] = [
+      createStringToken([
+        STRING_PATTERNS.doubleQuote,
+        STRING_PATTERNS.singleQuote,
+      ]),
+      {
+        name: "attribute",
+        pattern: /[a-zA-Z0-9_-]+(?=\s*=)/g,
+        className: "nsh-variable",
+      },
+      {
+        name: "operator",
+        pattern: /=/g,
+        className: "nsh-operator",
+      },
+      {
+        name: "attribute-value",
+        pattern: /[^\s"'>]+/g,
+        className: "nsh-string",
+      },
+    ];
+
     return {
       root: [
         {
@@ -87,44 +134,33 @@ export class HTML implements LanguageDefinition {
           className: "nsh-string",
           push: "inCdata",
         },
+        // Ouverture de balise <script ...>
         {
           name: "script-start",
-          pattern: /<script[^>]*>/gi,
+          pattern: /<script\b/gi,
           className: "nsh-keyword",
-          push: "inScript",
+          push: "inScriptTag",
         },
+        // Ouverture de balise <style ...>
         {
           name: "style-start",
-          pattern: /<style[^>]*>/gi,
+          pattern: /<style\b/gi,
           className: "nsh-keyword",
-          push: "inStyle",
-        },
-        {
-          name: "tag-open",
-          pattern: /<[a-zA-Z][a-zA-Z0-9]*/g,
-          className: "nsh-keyword",
+          push: "inStyleTag",
         },
         {
           name: "tag-close",
-          pattern: /<\/[a-zA-Z][a-zA-Z0-9]*/g,
+          pattern: /<\/[a-zA-Z0-9_-]+/g,
+          className: "nsh-keyword",
+        },
+        {
+          name: "tag-open",
+          pattern: /<[a-zA-Z0-9_-]+/g,
           className: "nsh-keyword",
         },
         { name: "tag-selfclose", pattern: /\/>/g, className: "nsh-keyword" },
         { name: "tag-bracket", pattern: />/g, className: "nsh-keyword" },
-        {
-          name: "attribute",
-          pattern: /\s[a-zA-Z-]+(?==)/g,
-          className: "nsh-variable",
-        },
-        createStringToken([
-          STRING_PATTERNS.doubleQuote,
-          STRING_PATTERNS.singleQuote,
-        ]),
-        {
-          name: "attribute-value",
-          pattern: /=\s*[^\s"'>]+/g,
-          className: "nsh-string",
-        },
+        ...tagAttributeRules,
         {
           name: "entity",
           pattern: /&[a-zA-Z0-9#]+;/g,
@@ -137,6 +173,43 @@ export class HTML implements LanguageDefinition {
           push: "inProcessing",
         },
       ],
+
+      // Gestion des attributs dans <script ...> avant d'entrer en JS
+      inScriptTag: [
+        {
+          name: "tag-selfclose",
+          pattern: /\/>/g,
+          className: "nsh-keyword",
+          pop: true,
+        },
+        {
+          name: "tag-bracket",
+          pattern: />/g,
+          className: "nsh-keyword",
+          pop: true,
+          push: "js_root",
+        },
+        ...tagAttributeRules,
+      ],
+
+      // Gestion des attributs dans <style ...> avant d'entrer en CSS
+      inStyleTag: [
+        {
+          name: "tag-selfclose",
+          pattern: /\/>/g,
+          className: "nsh-keyword",
+          pop: true,
+        },
+        {
+          name: "tag-bracket",
+          pattern: />/g,
+          className: "nsh-keyword",
+          pop: true,
+          push: "css_root",
+        },
+        ...tagAttributeRules,
+      ],
+
       inComment: [
         {
           name: "comment",
@@ -144,7 +217,11 @@ export class HTML implements LanguageDefinition {
           className: "nsh-comment",
           pop: true,
         },
-        { name: "comment", pattern: /(?:(?!-->).)+/g, className: "nsh-comment" },
+        {
+          name: "comment",
+          pattern: /(?:(?!-->).)+/g,
+          className: "nsh-comment",
+        },
       ],
       inCdata: [
         {
@@ -154,24 +231,6 @@ export class HTML implements LanguageDefinition {
           pop: true,
         },
         { name: "cdata", pattern: /(?:(?!\]\]>).)+/g, className: "nsh-string" },
-      ],
-      inScript: [
-        {
-          name: "script-end",
-          pattern: /<\/script>/gi,
-          className: "nsh-keyword",
-          pop: true,
-        },
-        { name: "script-content", pattern: /(?:(?!<\/script>).)+/gi, className: "nsh-string" },
-      ],
-      inStyle: [
-        {
-          name: "style-end",
-          pattern: /<\/style>/gi,
-          className: "nsh-keyword",
-          pop: true,
-        },
-        { name: "style-content", pattern: /(?:(?!<\/style>).)+/gi, className: "nsh-string" },
       ],
       inProcessing: [
         {
@@ -186,6 +245,9 @@ export class HTML implements LanguageDefinition {
           className: "nsh-comment",
         },
       ],
+
+      ...jsStates,
+      ...cssStates,
     };
   }
 
