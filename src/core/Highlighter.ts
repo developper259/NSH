@@ -92,6 +92,7 @@ export class Highlighter {
       initialStateStack,
       lineIndex,
     );
+
     return { tokens, finalState: finalStateStack };
   }
 
@@ -263,6 +264,7 @@ export class Highlighter {
 
       // CSS spécifiques
       selector: "nsh-function",
+      "selector-tag": "nsh-function",
       "selector-id": "nsh-function",
       "selector-class": "nsh-function",
       "selector-attribute": "nsh-variable",
@@ -270,14 +272,31 @@ export class Highlighter {
       "pseudo-element": "nsh-keyword",
       property: "nsh-keyword",
       value: "nsh-string",
+      "value-identifier": "nsh-string",
       color: "nsh-number",
+      "hex-color": "nsh-number",
       "var-function": "nsh-variable",
       "at-rule": "nsh-keyword",
       important: "nsh-keyword",
       combinator: "nsh-operator",
+
+      // YAML spécifiques
+      "yaml-key": "nsh-variable",
+      "yaml-value": "nsh-string",
+
+      // JSON spécifiques
+      "json-key": "nsh-variable",
+
+      // PHP spécifiques
+      "php-open": "nsh-keyword",
+      "php-close": "nsh-keyword",
+      "object-operator": "nsh-operator",
+      "scope-resolution": "nsh-operator",
+      "namespace-separator": "nsh-operator",
+      "class-name": "nsh-variable",
     };
 
-    return classMap[tokenType] || "nsh-variable";
+    return classMap[tokenType] || '';
   }
 
   private escapeHtml(text: string): string {

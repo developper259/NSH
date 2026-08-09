@@ -47,8 +47,14 @@ export class HTML implements LanguageDefinition {
     },
     {
       name: "attribute-value",
-      pattern: /[^\s"'>]+/g,
+      pattern: /(?<==\s*)[^\s"'<>=]+/g,
       className: "nsh-string",
+    },
+    // Catch-all attribut booléen (required, disabled, checked...)
+    {
+      name: "attribute",
+      pattern: /[a-zA-Z0-9_-]+/g,
+      className: "nsh-variable",
     },
     createCommentToken(COMMENT_PATTERNS.multiLine.dashDash),
     {
@@ -69,7 +75,6 @@ export class HTML implements LanguageDefinition {
   }
 
   public getStates(): Record<string, TokenType[]> {
-    // Génération des états JavaScript isolés (JS dans <script>)
     const jsStates = createEmbeddedStates({
       language: this.js,
       exitRule: {
@@ -80,7 +85,6 @@ export class HTML implements LanguageDefinition {
       prefix: "js_",
     });
 
-    // Génération des états CSS isolés (CSS dans <style>)
     const cssStates = createEmbeddedStates({
       language: this.css,
       exitRule: {
@@ -91,13 +95,19 @@ export class HTML implements LanguageDefinition {
       prefix: "css_",
     });
 
-    // Ordre strict des règles pour les attributs de balises
-    // (Les chaînes de caractères DOIVENT passer en premier)
     const tagAttributeRules: TokenType[] = [
-      createStringToken([
-        STRING_PATTERNS.doubleQuote,
-        STRING_PATTERNS.singleQuote,
-      ]),
+      {
+        name: "string",
+        pattern: /"/g,
+        className: "nsh-string",
+        push: "inDoubleQuote",
+      },
+      {
+        name: "string",
+        pattern: /'/g,
+        className: "nsh-string",
+        push: "inSingleQuote",
+      },
       {
         name: "attribute",
         pattern: /[a-zA-Z0-9_-]+(?=\s*=)/g,
@@ -110,8 +120,13 @@ export class HTML implements LanguageDefinition {
       },
       {
         name: "attribute-value",
-        pattern: /[^\s"'>]+/g,
+        pattern: /(?<==\s*)[^\s"'<>=]+/g,
         className: "nsh-string",
+      },
+      {
+        name: "attribute",
+        pattern: /[a-zA-Z0-9_-]+/g,
+        className: "nsh-variable",
       },
     ];
 
@@ -134,14 +149,12 @@ export class HTML implements LanguageDefinition {
           className: "nsh-string",
           push: "inCdata",
         },
-        // Ouverture de balise <script ...>
         {
           name: "script-start",
           pattern: /<script\b/gi,
           className: "nsh-keyword",
           push: "inScriptTag",
         },
-        // Ouverture de balise <style ...>
         {
           name: "style-start",
           pattern: /<style\b/gi,
@@ -152,15 +165,14 @@ export class HTML implements LanguageDefinition {
           name: "tag-close",
           pattern: /<\/[a-zA-Z0-9_-]+/g,
           className: "nsh-keyword",
+          push: "inTag",
         },
         {
           name: "tag-open",
           pattern: /<[a-zA-Z0-9_-]+/g,
           className: "nsh-keyword",
+          push: "inTag",
         },
-        { name: "tag-selfclose", pattern: /\/>/g, className: "nsh-keyword" },
-        { name: "tag-bracket", pattern: />/g, className: "nsh-keyword" },
-        ...tagAttributeRules,
         {
           name: "entity",
           pattern: /&[a-zA-Z0-9#]+;/g,
@@ -174,7 +186,22 @@ export class HTML implements LanguageDefinition {
         },
       ],
 
-      // Gestion des attributs dans <script ...> avant d'entrer en JS
+      inTag: [
+        {
+          name: "tag-selfclose",
+          pattern: /\/>/g,
+          className: "nsh-keyword",
+          pop: true,
+        },
+        {
+          name: "tag-bracket",
+          pattern: />/g,
+          className: "nsh-keyword",
+          pop: true,
+        },
+        ...tagAttributeRules,
+      ],
+
       inScriptTag: [
         {
           name: "tag-selfclose",
@@ -192,7 +219,6 @@ export class HTML implements LanguageDefinition {
         ...tagAttributeRules,
       ],
 
-      // Gestion des attributs dans <style ...> avant d'entrer en CSS
       inStyleTag: [
         {
           name: "tag-selfclose",
@@ -208,6 +234,33 @@ export class HTML implements LanguageDefinition {
           push: "css_root",
         },
         ...tagAttributeRules,
+      ],
+
+      inDoubleQuote: [
+        {
+          name: "string",
+          pattern: /"/g,
+          className: "nsh-string",
+          pop: true,
+        },
+        {
+          name: "string",
+          pattern: /(?:(?!"|<\?php\b|<\?=).)+/g,
+          className: "nsh-string",
+        },
+      ],
+      inSingleQuote: [
+        {
+          name: "string",
+          pattern: /'/g,
+          className: "nsh-string",
+          pop: true,
+        },
+        {
+          name: "string",
+          pattern: /(?:(?!'|<\?php\b|<\?=).)+/g,
+          className: "nsh-string",
+        },
       ],
 
       inComment: [
