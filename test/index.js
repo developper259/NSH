@@ -1,17 +1,23 @@
-const { NSHServer } = require('../dist/core/Socket');
+const { NSHServer } = require("../dist/core/Socket");
 
-const port = 1212;
-const server = new NSHServer(port);
+const nsh = new NSHServer();
 
-server.start();
+async function main() {
+  try {
+    const port = await nsh.start();
+    console.log(`NSH lancé sur le port dynamique : ${port}`);
+    console.log(`URL : ws://127.0.0.1:${port}`);
+  } catch (error) {
+    console.error("Impossible de démarrer NSH :", error);
+    process.exitCode = 1;
+  }
+}
 
-process.on('SIGINT', () => {
-    console.log('\nArrêt du serveur NSH de test...');
-    server.stop();
-    process.exit(0);
-});
+async function shutdown() {
+  await nsh.stop();
+  process.exit(0);
+}
 
-process.on('SIGTERM', () => {
-    server.stop();
-    process.exit(0);
-});
+process.once("SIGINT", shutdown);
+process.once("SIGTERM", shutdown);
+main();

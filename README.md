@@ -28,6 +28,18 @@ Built-in languages: JavaScript, TypeScript, Python, HTML, CSS, JSON, YAML, PHP, 
 
 Themes are copied to `dist/themes/` during build. The generated HTML includes `nsh-theme-dark` or `nsh-theme-light` classes.
 
+## Optional WebSocket server
+
+```js
+const { NSHServer } = require("nsh/server");
+
+const server = new NSHServer();
+const port = await server.start();
+console.log(`ws://127.0.0.1:${port}`);
+```
+
+The default port is selected by the operating system and the default host is `127.0.0.1`. A port can be forced with `new NSHServer(8080)` or with `{ port, host, maxPayload }`. `stop()` returns a Promise and `getPort()` returns `null` when the server is not listening.
+
 ## Development
 
 ```sh

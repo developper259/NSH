@@ -16,7 +16,10 @@ test("retokenizes multiline dependents until state convergence", () => {
 });
 
 test("supports line insertion and deletion", () => {
-  const document = new IncrementalDocument(new Tokenizer(new JavaScript()), "const a = 1;");
+  const document = new IncrementalDocument(
+    new Tokenizer(new JavaScript()),
+    "const a = 1;",
+  );
   document.updateLines(1, 0, ["const b = 2;"]);
   assert.equal(document.getLines().length, 2);
   document.updateLines(0, 1, []);

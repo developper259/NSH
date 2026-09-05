@@ -12,11 +12,11 @@ function languageFrom(states) {
 }
 
 test("matches rules only at the current position", () => {
-  const tokenizer = new Tokenizer(languageFrom({
-    root: [
-      { name: "word", pattern: /b/g, className: "custom-word" },
-    ],
-  }));
+  const tokenizer = new Tokenizer(
+    languageFrom({
+      root: [{ name: "word", pattern: /b/g, className: "custom-word" }],
+    }),
+  );
 
   const result = tokenizer.tokenizeLine("a", ["root"], 0);
   assert.deepEqual(result.tokens, []);
@@ -44,9 +44,11 @@ test("caches language states until the language changes", () => {
 });
 
 test("preserves the rule class name on tokens", () => {
-  const tokenizer = new Tokenizer(languageFrom({
-    root: [{ name: "word", pattern: /word/g, className: "custom-word" }],
-  }));
+  const tokenizer = new Tokenizer(
+    languageFrom({
+      root: [{ name: "word", pattern: /word/g, className: "custom-word" }],
+    }),
+  );
 
   assert.equal(tokenizer.tokenize("word")[0].className, "custom-word");
 });

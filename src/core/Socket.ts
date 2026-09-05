@@ -5,38 +5,105 @@ import { defaultRegistry } from "../languages/Languages";
 import { DetectLanguageResponse, HighlightRequest, HighlightResponse, SupportedLanguageResponse, NSHServerOptions } from "../types/socket";
 
 export class NSHServer {
+  private readonly configuredPort: number;
   private port: number;
   private host: string;
   private maxPayload: number;
   private wss: WebSocketServer | null = null;
+  private listening = false;
+  private startPromise: Promise<number> | null = null;
+  private stopPromise: Promise<void> | null = null;
 
-  constructor(options: number | NSHServerOptions = 8080) {
+  constructor(options: number | NSHServerOptions = 0) {
     const config = typeof options === "number" ? { port: options } : options;
-    this.port = config.port ?? 8080;
+    this.configuredPort = config.port ?? 0;
+    this.port = this.configuredPort;
     this.host = config.host ?? "127.0.0.1";
     this.maxPayload = config.maxPayload ?? 2 * 1024 * 1024;
   }
 
-  public start(): void {
-    if (this.wss) {
-      console.warn(
-        `Le serveur NSH est déjà en cours d'exécution sur le port ${this.port}`,
-      );
-      return;
+  public async start(): Promise<number> {
+    if (this.stopPromise) {
+      await this.stopPromise;
+      this.stopPromise = null;
     }
 
-    this.wss = new WebSocketServer({ host: this.host, port: this.port, maxPayload: this.maxPayload });
+    if (this.wss && this.startPromise) {
+      return this.startPromise;
+    }
+    if (this.wss) {
+      return this.port;
+    }
 
-    this.wss.on("connection", (ws: WebSocket) => this.handleConnection(ws));
-    this.wss.on("error", () => undefined);
+    const server = new WebSocketServer({
+      host: this.host,
+      port: this.configuredPort,
+      maxPayload: this.maxPayload,
+    });
+    this.wss = server;
+
+    server.on("connection", (ws: WebSocket) => this.handleConnection(ws));
+    this.startPromise = new Promise<number>((resolve, reject) => {
+      const cleanup = (): void => {
+        server.removeListener("listening", onListening);
+        server.removeListener("error", onError);
+      };
+      const onListening = (): void => {
+        const address = server.address();
+        if (!address || typeof address === "string") {
+          cleanup();
+          this.wss = null;
+          this.listening = false;
+          this.startPromise = null;
+          reject(new Error("NSH server did not expose a TCP port"));
+          return;
+        }
+
+        this.port = address.port;
+        cleanup();
+        this.listening = true;
+        resolve(this.port);
+      };
+      const onError = (error: Error): void => {
+        cleanup();
+        this.wss = null;
+        this.listening = false;
+        this.startPromise = null;
+        reject(error);
+      };
+
+      server.once("listening", onListening);
+      server.once("error", onError);
+    });
+
+    return this.startPromise;
   }
 
-  public stop(): void {
-    if (this.wss) {
-      this.wss.close(() => {
-      });
-      this.wss = null;
+  public getPort(): number | null {
+    return this.wss && this.listening ? this.port : null;
+  }
+
+  public stop(): Promise<void> {
+    if (this.stopPromise) {
+      return this.stopPromise;
     }
+    if (!this.wss) {
+      this.port = this.configuredPort;
+      return Promise.resolve();
+    }
+
+    const server = this.wss;
+    this.stopPromise = new Promise<void>((resolve) => {
+      server.close(() => {
+        this.wss = null;
+        this.listening = false;
+        this.startPromise = null;
+        this.port = this.configuredPort;
+        this.stopPromise = null;
+        resolve();
+      });
+    });
+    return this.stopPromise;
   }
 
   private handleConnection(ws: WebSocket): void {
