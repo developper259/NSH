@@ -4,11 +4,13 @@ import { TypeScript } from './TypeScript';
 import { Python } from './Python';
 import { HTML } from './HTML';
 import { CSS } from './CSS';
-import { Json } from './JSON';
-import { Yaml } from './YAML';
+import { JSON } from './JSON';
+import { YAML } from './YAML';
 import { PHP } from './PHP';
 import { Java } from './Java';
 import { XML } from './XML';
+import { CPP } from './CPP';
+import { LanguageRegistry } from '../core/LanguageRegistry';
 
 export const languages: Record<string, LanguageDefinition> = {
   javascript: new JavaScript(),
@@ -16,9 +18,16 @@ export const languages: Record<string, LanguageDefinition> = {
   python: new Python(),
   html: new HTML(),
   css: new CSS(),
-  json: new Json(),
-  yaml: new Yaml(),
+  json: new JSON(),
+  yaml: new YAML(),
   php: new PHP(),
   java: new Java(),
   xml: new XML(),
+  cpp: new CPP(),
 };
+
+export const defaultRegistry = new LanguageRegistry();
+
+for (const language of Object.values(languages)) {
+  defaultRegistry.registerLanguage(language);
+}

@@ -3,6 +3,7 @@ import { LanguageDefinition } from "../types/language";
 
 export class Tokenizer {
   private language: LanguageDefinition;
+  private states: Record<string, CompiledTokenRule[]> | null = null;
 
   private static readonly DEFAULT_STATE: string[] = ["root"];
 
@@ -39,16 +40,14 @@ export class Tokenizer {
     lineIndex: number,
   ): { tokens: Token[]; finalStateStack: string[] } {
     const tokens: Token[] = [];
-    const states =
-      typeof this.language.getStates === "function"
-        ? this.language.getStates()
-        : { root: this.language.getTokenTypes() };
+    const states = this.getCompiledStates();
 
     const stateStack =
       initialStateStack && initialStateStack.length > 0
         ? [...initialStateStack]
         : [...Tokenizer.DEFAULT_STATE];
     let position = 0;
+    let previousToken: Token | undefined;
 
     while (position < line.length) {
       const currentState = stateStack[stateStack.length - 1];
@@ -56,27 +55,34 @@ export class Tokenizer {
       let matched = false;
 
       for (const rule of currentRules) {
-        rule.pattern.lastIndex = position;
-        const match = rule.pattern.exec(line);
+        if (rule.original.name === "regex" && previousToken &&
+          ["variable", "number", "string", "regex"].includes(previousToken.type)) {
+          continue;
+        }
 
-        if (match && match.index === position) {
+        rule.matcher.lastIndex = position;
+        const match = rule.matcher.exec(line);
+
+        if (match) {
           if (match[0].length === 0) continue;
 
           tokens.push({
-            type: rule.name,
+            type: rule.original.name,
             value: match[0],
             line: lineIndex + 1,
             column: position + 1,
+            className: rule.original.className,
           });
+          previousToken = tokens[tokens.length - 1];
 
           position += match[0].length;
           matched = true;
 
-          if (rule.pop && stateStack.length > 1) {
+          if (rule.original.pop && stateStack.length > 1) {
             stateStack.pop();
           }
-          if (rule.push) {
-            stateStack.push(rule.push);
+          if (rule.original.push) {
+            stateStack.push(rule.original.push);
           }
 
           break;
@@ -93,5 +99,42 @@ export class Tokenizer {
 
   public setLanguage(language: LanguageDefinition): void {
     this.language = language;
+    this.states = null;
   }
+
+  private getCompiledStates(): Record<string, CompiledTokenRule[]> {
+    if (this.states) {
+      return this.states;
+    }
+
+    const rawStates =
+      typeof this.language.getStates === "function"
+        ? this.language.getStates()
+        : { root: this.language.getTokenTypes() };
+
+    this.states = Object.fromEntries(
+      Object.entries(rawStates).map(([stateName, rules]) => [
+        stateName,
+        rules.map((original) => ({
+          original,
+          matcher: toStickyRegExp(original.pattern),
+        })),
+      ]),
+    );
+
+    return this.states;
+  }
+}
+
+interface CompiledTokenRule {
+  original: import("../types/token").TokenType;
+  matcher: RegExp;
+}
+
+function toStickyRegExp(pattern: RegExp): RegExp {
+  if (pattern.sticky) {
+    return new RegExp(pattern.source, pattern.flags);
+  }
+
+  return new RegExp(pattern.source, `${pattern.flags.replace("g", "")}y`);
 }

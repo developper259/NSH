@@ -237,7 +237,19 @@ class PHPCode implements LanguageDefinition {
 
   public getStates(): Record<string, TokenType[]> {
     return {
-      root: this.tokenTypes,
+      root: [
+        {
+          name: "comment",
+          pattern: /\/\*/g,
+          className: "nsh-comment",
+          push: "inMultiLineComment",
+        },
+        ...this.tokenTypes,
+      ],
+      inMultiLineComment: [
+        { name: "comment", pattern: /\*\//g, className: "nsh-comment", pop: true },
+        { name: "comment", pattern: /(?:(?!\*\/).)+/g, className: "nsh-comment" },
+      ],
     };
   }
 

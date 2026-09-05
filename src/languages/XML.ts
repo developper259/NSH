@@ -13,7 +13,7 @@ export class XML implements LanguageDefinition {
     {
       name: "xml-decl",
       pattern: /<\?xml[\s\S]*?\?>/gi,
-      className: "nsh-comment",
+      className: "nsh-keyword",
     },
     { name: "doctype", pattern: /<!DOCTYPE[^>]*>/gi, className: "nsh-keyword" },
     {
@@ -105,7 +105,7 @@ export class XML implements LanguageDefinition {
         {
           name: "xml-decl",
           pattern: /<\?xml\b/gi,
-          className: "nsh-comment",
+          className: "nsh-keyword",
           push: "inProcessing",
         },
         {

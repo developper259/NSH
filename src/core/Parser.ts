@@ -12,9 +12,11 @@ export interface ParsedCode {
 
 export class Parser {
   private tokens: Token[];
+  private sourceLineCount: number | undefined;
 
-  constructor(tokens: Token[]) {
+  constructor(tokens: Token[], source?: string) {
     this.tokens = tokens;
+    this.sourceLineCount = source === undefined ? undefined : source.split("\n").length;
   }
 
   public parse(): ParsedCode {
@@ -28,7 +30,11 @@ export class Parser {
     }
 
     const lines: ParsedLine[] = [];
-    const totalLines = Math.max(...Array.from(linesMap.keys()), 0);
+    let highestTokenLine = 0;
+    for (const lineNumber of linesMap.keys()) {
+      if (lineNumber > highestTokenLine) highestTokenLine = lineNumber;
+    }
+    const totalLines = Math.max(this.sourceLineCount || 0, highestTokenLine);
 
     for (let i = 1; i <= totalLines; i++) {
       lines.push({
@@ -45,13 +51,5 @@ export class Parser {
 
   public setTokens(tokens: Token[]): void {
     this.tokens = tokens;
-  }
-
-  private parseStatement(): any {
-    return null;
-  }
-
-  private parseExpression(): any {
-    return null;
   }
 }

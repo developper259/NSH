@@ -49,12 +49,13 @@ export const STRING_PATTERNS = {
 
 // Patterns de nombres communs
 export const NUMBER_PATTERNS = {
-  integer: /\b\d+\b/g,
-  decimal: /\b\d+\.\d+\b/g,
-  hex: /\b0x[0-9a-fA-F]+\b/g,
-  binary: /\b0b[01]+\b/g,
-  octal: /\b0o[0-7]+\b/g,
-  scientific: /\b\d+\.?\d*[eE][+-]?\d+\b/g
+  bigint: /\b\d(?:_?\d)*n\b/g,
+  hex: /\b0x[0-9a-fA-F](?:_?[0-9a-fA-F])*\b/g,
+  binary: /\b0b[01](?:_?[01])*\b/g,
+  octal: /\b0o[0-7](?:_?[0-7])*\b/g,
+  scientific: /\b\d(?:_?\d)*(?:\.\d(?:_?\d)*)?[eE][+-]?\d(?:_?\d)*\b/g,
+  decimal: /\b\d(?:_?\d)*\.\d(?:_?\d)*\b|\b\d(?:_?\d)*\.(?!\w)/g,
+  integer: /\b\d(?:_?\d)*\b/g
 };
 
 // Keywords communs

@@ -8,7 +8,7 @@ import {
   NUMBER_PATTERNS,
 } from "./shared";
 
-export class Json implements LanguageDefinition {
+export class JSON implements LanguageDefinition {
   name = "json";
   extensions = [
     ".json",
@@ -16,7 +16,6 @@ export class Json implements LanguageDefinition {
     ".eslintrc",
     ".prettierrc",
     ".babelrc",
-    ".lock",
   ];
 
   private jsonConstants = ["true", "false", "null"];
@@ -29,11 +28,11 @@ export class Json implements LanguageDefinition {
     },
     createKeywordToken(this.jsonConstants),
     createStringToken([STRING_PATTERNS.doubleQuote]),
-    createNumberToken([
-      NUMBER_PATTERNS.integer,
-      NUMBER_PATTERNS.decimal,
-      NUMBER_PATTERNS.scientific,
-    ]),
+    {
+      name: "number",
+      pattern: /-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?/g,
+      className: "nsh-number",
+    },
     {
       name: "bracket",
       pattern: /[\[\]\{\}]/g,

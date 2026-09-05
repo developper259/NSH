@@ -14,7 +14,7 @@ import {
 
 export class TypeScript implements LanguageDefinition {
   name = "typescript";
-  extensions = [".ts", ".tsx"];
+  extensions = [".ts"];
 
   private tsKeywords = [
     "var",
@@ -192,6 +192,7 @@ export class TypeScript implements LanguageDefinition {
       className: "nsh-variable",
     },
     createNumberToken([
+      NUMBER_PATTERNS.bigint,
       NUMBER_PATTERNS.integer,
       NUMBER_PATTERNS.decimal,
       NUMBER_PATTERNS.hex,
@@ -209,23 +210,23 @@ export class TypeScript implements LanguageDefinition {
     },
     {
       name: "type-annotation",
-      pattern: /:\s*([a-zA-Z0-9_<>[\]{}|,.\s]+)/g,
+      pattern: /:\s*[A-Za-z_$][A-Za-z0-9_$]*(?:\s*<[^>]+>)?(?:\[\])?(?:\s*\|\s*[A-Za-z_$][A-Za-z0-9_$]*)*/g,
       className: "nsh-keyword",
     },
     {
       name: "generic",
-      pattern: /<[a-zA-Z0-9_,\s<>]+>/g,
+      pattern: /(?<=[A-Za-z_$])<[A-Z][A-Za-z0-9_,\s<>]*>/g,
       className: "nsh-keyword",
     },
     createFunctionToken(),
     { name: "arrow-function", pattern: /=>/g, className: "nsh-operator" },
     { name: "bracket", pattern: /[\[\]\{\}\(\)]/g, className: "nsh-bracket" },
+    { name: "spread", pattern: /\.\.\./g, className: "nsh-operator" },
     {
       name: "operator",
       pattern: /[+\-*/%=<>!&|^~?:;,.]/g,
       className: "nsh-operator",
     },
-    { name: "spread", pattern: /\.\.\./g, className: "nsh-operator" },
     { name: "non-null", pattern: /!/g, className: "nsh-operator" },
     { name: "optional-chaining", pattern: /\?\.?/g, className: "nsh-operator" },
     createVariableToken(),
@@ -265,6 +266,7 @@ export class TypeScript implements LanguageDefinition {
           STRING_PATTERNS.doubleQuote,
         ]),
         createNumberToken([
+          NUMBER_PATTERNS.bigint,
           NUMBER_PATTERNS.integer,
           NUMBER_PATTERNS.decimal,
           NUMBER_PATTERNS.hex,
@@ -292,12 +294,12 @@ export class TypeScript implements LanguageDefinition {
         },
         {
           name: "type-annotation",
-          pattern: /:\s*([a-zA-Z0-9_<>[\]{}|,.\s]+)/g,
+          pattern: /:\s*[A-Za-z_$][A-Za-z0-9_$]*(?:\s*<[^>]+>)?(?:\[\])?(?:\s*\|\s*[A-Za-z_$][A-Za-z0-9_$]*)*/g,
           className: "nsh-keyword",
         },
         {
           name: "generic",
-          pattern: /<[a-zA-Z0-9_,\s<>]+>/g,
+          pattern: /(?<=[A-Za-z_$])<[A-Z][A-Za-z0-9_,\s<>]*>/g,
           className: "nsh-keyword",
         },
         createFunctionToken(),
@@ -307,12 +309,12 @@ export class TypeScript implements LanguageDefinition {
           pattern: /[\[\]\{\}\(\)]/g,
           className: "nsh-bracket",
         },
+        { name: "spread", pattern: /\.\.\./g, className: "nsh-operator" },
         {
           name: "operator",
-          pattern: /[+\-*/%=<>!&|^~?:;,.]/g,
+          pattern: /\?\?=?|\?\.|=>|===|!==|==|!=|<=|>=|\+\+|--|&&|\|\||\*\*|[+\-*/%=<>!&|^~?:;,.]/g,
           className: "nsh-operator",
         },
-        { name: "spread", pattern: /\.\.\./g, className: "nsh-operator" },
         { name: "non-null", pattern: /!/g, className: "nsh-operator" },
         {
           name: "optional-chaining",

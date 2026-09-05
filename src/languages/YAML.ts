@@ -8,7 +8,7 @@ import {
   NUMBER_PATTERNS,
 } from "./shared";
 
-export class Yaml implements LanguageDefinition {
+export class YAML implements LanguageDefinition {
   name = "yaml";
   extensions = [".yml", ".yaml"];
 

@@ -1,15 +1,20 @@
 import { WebSocketServer, WebSocket } from "ws";
 
 import { Highlighter } from "./Highlighter";
-import { languages } from "../languages/Languages";
-import { DetectLanguageResponse, HighlightRequest, HighlightResponse, SupportedLanguageResponse } from "../types/socket";
+import { defaultRegistry } from "../languages/Languages";
+import { DetectLanguageResponse, HighlightRequest, HighlightResponse, SupportedLanguageResponse, NSHServerOptions } from "../types/socket";
 
 export class NSHServer {
   private port: number;
+  private host: string;
+  private maxPayload: number;
   private wss: WebSocketServer | null = null;
 
-  constructor(port: number = 8080) {
-    this.port = port;
+  constructor(options: number | NSHServerOptions = 8080) {
+    const config = typeof options === "number" ? { port: options } : options;
+    this.port = config.port ?? 8080;
+    this.host = config.host ?? "127.0.0.1";
+    this.maxPayload = config.maxPayload ?? 2 * 1024 * 1024;
   }
 
   public start(): void {
@@ -20,25 +25,23 @@ export class NSHServer {
       return;
     }
 
-    this.wss = new WebSocketServer({ port: this.port });
-    console.log(`NSH Socket Server démarré sur ws://localhost:${this.port}`);
+    this.wss = new WebSocketServer({ host: this.host, port: this.port, maxPayload: this.maxPayload });
 
     this.wss.on("connection", (ws: WebSocket) => this.handleConnection(ws));
+    this.wss.on("error", () => undefined);
   }
 
   public stop(): void {
     if (this.wss) {
       this.wss.close(() => {
-        console.log("NSH Socket Server arrêté.");
       });
       this.wss = null;
     }
   }
 
   private handleConnection(ws: WebSocket): void {
-    console.log("Nouveau client connecté");
     ws.on("message", (message: string) => this.handleMessage(ws, message));
-    ws.on("close", () => console.log("Client déconnecté"));
+    ws.on("error", () => undefined);
   }
 
   private handleMessage(ws: WebSocket, message: string): void {
@@ -47,11 +50,11 @@ export class NSHServer {
     try {
       request = JSON.parse(message.toString());
 
-      if (!request.id) {
+      if (!isValidRequest(request)) {
         ws.send(
           JSON.stringify({
             success: false,
-            error: "Request not valid : id missing !",
+            error: "Request not valid",
           }),
         );
         return;
@@ -85,14 +88,13 @@ export class NSHServer {
   private handleHighlight(ws: WebSocket, request: HighlightRequest): void {
     try {
       if (!request.language || request.code === undefined || request.code === null) {
-        console.log(request);
         throw new Error('Request not valid : language or code missing !');
       }
 
       const language: string = request.language || "";
       const code: string = request.code;
 
-      const languageDef = languages[language.toLowerCase()];
+      const languageDef = defaultRegistry.getLanguage(language);
 
       if (!languageDef) {
         throw new Error(`Langage non supporté : ${language}`);
@@ -145,7 +147,7 @@ export class NSHServer {
       const language: string = request.language;
       const line: string = request.code;
 
-      const languageDef = languages[language.toLowerCase()];
+      const languageDef = defaultRegistry.getLanguage(language);
 
       if (!languageDef) {
         throw new Error(`Langage non supporté : ${language}`);
@@ -244,4 +246,14 @@ export class NSHServer {
       ws.send(JSON.stringify(errorResponse));
     }
   }
+}
+
+function isValidRequest(value: unknown): value is HighlightRequest {
+  if (!value || typeof value !== "object") return false;
+  const request = value as Partial<HighlightRequest>;
+  const requestTypes = ["highlight", "highlightLine", "supportedLanguages", "detectLanguage"];
+  const responseTypes = ["html", "tokens", "both"];
+  return typeof request.id === "string" && request.id.length > 0 &&
+    typeof request.requestType === "string" && requestTypes.includes(request.requestType) &&
+    (request.responseType === undefined || responseTypes.includes(request.responseType));
 }

@@ -1,6 +1,12 @@
 import { HighlightOptions } from "./highlighter";
 import { Token } from "./token";
 
+export interface NSHServerOptions {
+  host?: string;
+  port?: number;
+  maxPayload?: number;
+}
+
 export interface HighlightRequest {
   id: string;
   requestType: 'highlight' | 'highlightLine' | 'supportedLanguages' | 'detectLanguage';

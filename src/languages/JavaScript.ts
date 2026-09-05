@@ -14,7 +14,7 @@ import {
 
 export class JavaScript implements LanguageDefinition {
   name = "javascript";
-  extensions = [".js", ".jsx", ".mjs"];
+  extensions = [".js", ".mjs"];
 
   private jsKeywords = [
     "var",
@@ -196,6 +196,7 @@ export class JavaScript implements LanguageDefinition {
       className: "nsh-variable",
     },
     createNumberToken([
+      NUMBER_PATTERNS.bigint,
       NUMBER_PATTERNS.integer,
       NUMBER_PATTERNS.decimal,
       NUMBER_PATTERNS.hex,
@@ -213,12 +214,12 @@ export class JavaScript implements LanguageDefinition {
     createFunctionToken(),
     { name: "arrow-function", pattern: /=>/g, className: "nsh-operator" },
     { name: "bracket", pattern: /[\[\]\{\}\(\)]/g, className: "nsh-bracket" },
+    { name: "spread", pattern: /\.\.\./g, className: "nsh-operator" },
     {
       name: "operator",
       pattern: /[+\-*/%=<>!&|^~?:;,.]/g,
       className: "nsh-operator",
     },
-    { name: "spread", pattern: /\.\.\./g, className: "nsh-operator" },
     createVariableToken(),
     {
       name: "jsx-tag",
@@ -251,12 +252,13 @@ export class JavaScript implements LanguageDefinition {
           STRING_PATTERNS.doubleQuote,
         ]),
         createNumberToken([
-          NUMBER_PATTERNS.integer,
-          NUMBER_PATTERNS.decimal,
+          NUMBER_PATTERNS.bigint,
+          NUMBER_PATTERNS.scientific,
           NUMBER_PATTERNS.hex,
           NUMBER_PATTERNS.binary,
           NUMBER_PATTERNS.octal,
-          NUMBER_PATTERNS.scientific,
+          NUMBER_PATTERNS.decimal,
+          NUMBER_PATTERNS.integer,
         ]),
         {
           name: "comment",
@@ -277,12 +279,12 @@ export class JavaScript implements LanguageDefinition {
           pattern: /[\[\]\{\}\(\)]/g,
           className: "nsh-bracket",
         },
+        { name: "spread", pattern: /\.\.\./g, className: "nsh-operator" },
         {
           name: "operator",
-          pattern: /[+\-*/%=<>!&|^~?:;,.]/g,
+          pattern: /\?\?=?|\?\.|=>|===|!==|==|!=|<=|>=|\+\+|--|&&|\|\||\*\*|[+\-*/%=<>!&|^~?:;,.]/g,
           className: "nsh-operator",
         },
-        { name: "spread", pattern: /\.\.\./g, className: "nsh-operator" },
         createVariableToken(),
         {
           name: "jsx-tag",

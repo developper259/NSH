@@ -138,6 +138,12 @@ export class Python implements LanguageDefinition {
     },
     { name: "decorator", pattern: /@\w+(\.\w+)*/g, className: "nsh-function" },
     {
+      name: "fstring-start",
+      pattern: /[fF]["']/g,
+      className: "nsh-string",
+      push: "inFStringBody",
+    },
+    {
       name: "string",
       pattern:
         /("""[\s\S]*?"""|'''[\s\S]*?'''|f"[^"]*"|f'[^']*'|r"[^"]*"|r'[^']*'|b"[^"]*"|b'[^']*'|"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')/g,
@@ -149,11 +155,12 @@ export class Python implements LanguageDefinition {
       className: "nsh-variable",
     },
     createNumberToken([
-      NUMBER_PATTERNS.integer,
-      NUMBER_PATTERNS.decimal,
       NUMBER_PATTERNS.hex,
       NUMBER_PATTERNS.binary,
       NUMBER_PATTERNS.octal,
+      NUMBER_PATTERNS.scientific,
+      NUMBER_PATTERNS.decimal,
+      NUMBER_PATTERNS.integer,
       /\b\d+j\b/g,
       /\b\d+\+\d+j\b/g,
     ]),
@@ -228,6 +235,12 @@ export class Python implements LanguageDefinition {
           push: "inDocSingle",
         },
         {
+          name: "fstring-start",
+          pattern: /[fF]["']/g,
+          className: "nsh-string",
+          push: "inFStringBody",
+        },
+        {
           name: "string",
           pattern:
             /(f"[^"]*"|f'[^']*'|r"[^"]*"|r'[^']*'|b"[^"]*"|b'[^']*'|"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')/g,
@@ -239,11 +252,12 @@ export class Python implements LanguageDefinition {
           className: "nsh-variable",
         },
         createNumberToken([
-          NUMBER_PATTERNS.integer,
-          NUMBER_PATTERNS.decimal,
           NUMBER_PATTERNS.hex,
           NUMBER_PATTERNS.binary,
           NUMBER_PATTERNS.octal,
+          NUMBER_PATTERNS.scientific,
+          NUMBER_PATTERNS.decimal,
+          NUMBER_PATTERNS.integer,
           /\b\d+j\b/g,
           /\b\d+\+\d+j\b/g,
         ]),
@@ -309,6 +323,11 @@ export class Python implements LanguageDefinition {
           pattern: /(?:(?!""").)+/g,
           className: "nsh-comment",
         },
+      ],
+      inFStringBody: [
+        { name: "string", pattern: /["']/g, className: "nsh-string", pop: true },
+        { name: "fstring-expression", pattern: /\{[^}]*\}/g, className: "nsh-variable" },
+        { name: "string", pattern: /[^{}"']+/g, className: "nsh-string" },
       ],
       inDocSingle: [
         {

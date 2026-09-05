@@ -3,20 +3,38 @@
   "version": "1.0.0",
   "description": "NSH (NDL Syntax Highlighter)",
   "license": "ISC",
-  "author": "",
+  "author": "developper259",
   "type": "commonjs",
   "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "require": "./dist/index.js"
+    },
+    "./server": {
+      "types": "./dist/server.d.ts",
+      "require": "./dist/server.js"
+    },
+    "./themes/*": "./dist/themes/*"
+  },
+  "files": ["dist", "README.md", "LICENSE"],
   "scripts": {
-    "build": "tsc",
+    "clean": "rm -rf dist",
+    "build": "tsc && node scripts/copy-themes.js",
+    "typecheck": "tsc --noEmit",
+    "test": "npm run build && node --test test/*.test.js",
+    "benchmark": "npm run build && node benchmark/index.js",
+    "prepack": "npm run clean && npm run build",
     "dev": "tsc --watch",
     "start": "tsc && node dist/index.js",
     "socket": "tsc && node test/index.js"
   },
   "dependencies": {
-    "typescript": "^7.0.2",
     "ws": "^8.21.1"
   },
   "devDependencies": {
-    "@types/ws": "^8.18.1"
+    "@types/ws": "^8.18.1",
+    "typescript": "^7.0.2"
   }
 }

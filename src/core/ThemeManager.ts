@@ -1,3 +1,6 @@
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+
 export class ThemeManager {
   private themes: Map<string, string>;
 
@@ -16,7 +19,12 @@ export class ThemeManager {
 
   public getThemeCSS(name: string): string {
     const cssPath = this.themes.get(name);
-    return cssPath || '';
+    if (!cssPath) return '';
+    try {
+      return fs.readFileSync(cssPath, 'utf8');
+    } catch {
+      return '';
+    }
   }
 
   public listThemes(): string[] {
@@ -28,7 +36,7 @@ export class ThemeManager {
   }
 
   private loadBuiltinThemes(): void {
-    this.registerTheme('light', './themes/css/light.css');
-    this.registerTheme('dark', './themes/css/dark.css');
+    this.registerTheme('light', path.join(__dirname, '..', 'themes', 'light.css'));
+    this.registerTheme('dark', path.join(__dirname, '..', 'themes', 'dark.css'));
   }
 }

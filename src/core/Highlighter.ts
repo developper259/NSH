@@ -6,7 +6,43 @@ import {
 } from "../types/highlighter";
 import { Tokenizer } from "./Tokenizer";
 import { LanguageDefinition } from "../types/language";
-import { languages } from "../languages/Languages";
+import { defaultRegistry } from "../languages/Languages";
+
+const CLASS_MAP: Readonly<Record<string, string>> = {
+  keyword: "nsh-keyword", string: "nsh-string", number: "nsh-number",
+  comment: "nsh-comment", function: "nsh-function", variable: "nsh-variable",
+  operator: "nsh-operator", bracket: "nsh-bracket", builtin: "nsh-function",
+  "template-expression": "nsh-variable", regex: "nsh-string",
+  "arrow-function": "nsh-operator", spread: "nsh-operator", type: "nsh-keyword",
+  jsdoc: "nsh-comment", "type-annotation": "nsh-keyword", generic: "nsh-keyword",
+  "non-null": "nsh-operator", "optional-chaining": "nsh-operator",
+  "jsx-tag": "nsh-keyword", decorator: "nsh-function",
+  "fstring-expression": "nsh-variable", docstring: "nsh-comment",
+  "type-hint": "nsh-keyword", comparison: "nsh-operator", assignment: "nsh-operator",
+  identity: "nsh-operator", membership: "nsh-operator", boolean: "nsh-operator",
+  walrus: "nsh-operator", "special-variable": "nsh-variable", tag: "nsh-keyword",
+  doctype: "nsh-keyword", "tag-open": "nsh-keyword", "tag-close": "nsh-keyword",
+  "tag-selfclose": "nsh-keyword", "tag-bracket": "nsh-keyword",
+  attribute: "nsh-variable", "attribute-value": "nsh-string", cdata: "nsh-string",
+  "processing-instruction": "nsh-comment", entity: "nsh-number",
+  "script-start": "nsh-keyword", "script-end": "nsh-keyword",
+  "style-start": "nsh-keyword", "style-end": "nsh-keyword", selector: "nsh-function",
+  "selector-tag": "nsh-function", "selector-id": "nsh-function",
+  "selector-class": "nsh-function", "selector-attribute": "nsh-variable",
+  "pseudo-class": "nsh-keyword", "pseudo-element": "nsh-keyword",
+  property: "nsh-keyword", value: "nsh-string", "value-identifier": "nsh-string",
+  color: "nsh-number", "hex-color": "nsh-number", "var-function": "nsh-variable",
+  "at-rule": "nsh-keyword", important: "nsh-keyword", combinator: "nsh-operator",
+  "yaml-key": "nsh-variable", "yaml-value": "nsh-string", "json-key": "nsh-variable",
+  "php-open": "nsh-keyword", "php-close": "nsh-keyword",
+  "object-operator": "nsh-operator", "scope-resolution": "nsh-operator",
+  "namespace-separator": "nsh-operator", "class-name": "nsh-variable",
+  "xml-decl": "nsh-keyword",
+};
+
+const HTML_ESCAPES: Readonly<Record<string, string>> = {
+  "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+};
 
 export class Highlighter {
   private tokenizer: Tokenizer;
@@ -20,7 +56,11 @@ export class Highlighter {
   }
 
   public static getSupportedLanguages(): string[] {
-    return Object.keys(languages);
+    return defaultRegistry.listLanguages();
+  }
+
+  public static registerLanguage(language: LanguageDefinition): void {
+    defaultRegistry.registerLanguage(language);
   }
 
   public static detectLanguage(extension: string): string | undefined {
@@ -28,18 +68,7 @@ export class Highlighter {
       ? extension.toLowerCase()
       : `.${extension.toLowerCase()}`;
 
-    for (const langKey in languages) {
-      const lang = languages[langKey];
-
-      if (
-        lang.extensions &&
-        lang.extensions.map((e) => e.toLowerCase()).includes(ext)
-      ) {
-        return lang.name;
-      }
-    }
-
-    return undefined;
+    return defaultRegistry.getLanguageByExtension(ext)?.name;
   }
 
   public highlight(code: string): HighlightResult {
@@ -113,10 +142,10 @@ export class Highlighter {
   }
 
   public replaceByClasses(tokens: Token[]): Token[] {
-    for (const token of tokens) {
-      token.type = this.getCssClass(token.type);
-    }
-    return tokens;
+    return tokens.map((token) => ({
+      ...token,
+      className: token.className || this.getCssClass(token.type),
+    }));
   }
 
   public getToken(code: string): Token[] {
@@ -144,7 +173,7 @@ export class Highlighter {
     const lines = code.split("\n");
     const linesMap = this.groupTokensByLine(tokens);
 
-    let html = '<div class="nsh-highlighter">';
+    let html = `<div class="nsh-highlighter nsh-theme-${this.themeName}">`;
 
     for (let i = 0; i < lines.length; i++) {
       const lineNumber = i + 1;
@@ -177,7 +206,7 @@ export class Highlighter {
         position = token.column - 1;
       }
 
-      const className = this.getCssClass(token.type);
+      const className = token.className || this.getCssClass(token.type);
       html += `<span class="${className}">${this.escapeHtml(token.value)}</span>`;
       position = token.column - 1 + token.value.length;
     }
@@ -205,109 +234,10 @@ export class Highlighter {
   }
 
   private getCssClass(tokenType: string): string {
-    const classMap: { [key: string]: string } = {
-      // Types de base
-      keyword: "nsh-keyword",
-      string: "nsh-string",
-      number: "nsh-number",
-      comment: "nsh-comment",
-      function: "nsh-function",
-      variable: "nsh-variable",
-      operator: "nsh-operator",
-      bracket: "nsh-bracket",
-
-      // JavaScript/TypeScript spécifiques
-      builtin: "nsh-function",
-      "template-expression": "nsh-variable",
-      regex: "nsh-string",
-      "arrow-function": "nsh-operator",
-      spread: "nsh-operator",
-      type: "nsh-keyword",
-      jsdoc: "nsh-comment",
-      "type-annotation": "nsh-keyword",
-      generic: "nsh-keyword",
-      "non-null": "nsh-operator",
-      "optional-chaining": "nsh-operator",
-      "jsx-tag": "nsh-keyword",
-
-      // Python spécifiques
-      decorator: "nsh-function",
-      "fstring-expression": "nsh-variable",
-      docstring: "nsh-comment",
-      "type-hint": "nsh-keyword",
-      comparison: "nsh-operator",
-      assignment: "nsh-operator",
-      identity: "nsh-operator",
-      membership: "nsh-operator",
-      boolean: "nsh-operator",
-      walrus: "nsh-operator",
-      "special-variable": "nsh-variable",
-
-      // HTML spécifiques
-      tag: "nsh-keyword",
-      doctype: "nsh-keyword",
-      "tag-open": "nsh-keyword",
-      "tag-close": "nsh-keyword",
-      "tag-selfclose": "nsh-keyword",
-      "tag-bracket": "nsh-keyword",
-      attribute: "nsh-variable",
-      "attribute-value": "nsh-string",
-      cdata: "nsh-string",
-      "processing-instruction": "nsh-comment",
-      "script-content": "nsh-string",
-      "style-content": "nsh-string",
-      entity: "nsh-number",
-      "script-start": "nsh-keyword",
-      "script-end": "nsh-keyword",
-      "style-start": "nsh-keyword",
-      "style-end": "nsh-keyword",
-
-      // CSS spécifiques
-      selector: "nsh-function",
-      "selector-tag": "nsh-function",
-      "selector-id": "nsh-function",
-      "selector-class": "nsh-function",
-      "selector-attribute": "nsh-variable",
-      "pseudo-class": "nsh-keyword",
-      "pseudo-element": "nsh-keyword",
-      property: "nsh-keyword",
-      value: "nsh-string",
-      "value-identifier": "nsh-string",
-      color: "nsh-number",
-      "hex-color": "nsh-number",
-      "var-function": "nsh-variable",
-      "at-rule": "nsh-keyword",
-      important: "nsh-keyword",
-      combinator: "nsh-operator",
-
-      // YAML spécifiques
-      "yaml-key": "nsh-variable",
-      "yaml-value": "nsh-string",
-
-      // JSON spécifiques
-      "json-key": "nsh-variable",
-
-      // PHP spécifiques
-      "php-open": "nsh-keyword",
-      "php-close": "nsh-keyword",
-      "object-operator": "nsh-operator",
-      "scope-resolution": "nsh-operator",
-      "namespace-separator": "nsh-operator",
-      "class-name": "nsh-variable",
-    };
-
-    return classMap[tokenType] || '';
+    return CLASS_MAP[tokenType] || "";
   }
 
   private escapeHtml(text: string): string {
-    const htmlEscapes: { [key: string]: string } = {
-      "&": "&amp;",
-      "<": "&lt;",
-      ">": "&gt;",
-      '"': "&quot;",
-      "'": "&#39;",
-    };
-
-    return text.replace(/[&<>"']/g, (char) => htmlEscapes[char]);
+    return text.replace(/[&<>"']/g, (char) => HTML_ESCAPES[char]);
   }
 }

@@ -4,7 +4,7 @@ import { createStringToken, STRING_PATTERNS } from "./shared";
 
 export class CSS implements LanguageDefinition {
   name = "css";
-  extensions = [".css", ".scss", ".sass"];
+  extensions = [".css"];
 
   private htmlTags = [
     "a",
@@ -166,7 +166,7 @@ export class CSS implements LanguageDefinition {
     {
       name: "number",
       pattern:
-        /\b\d+(?:\.\d+)?(?:px|em|rem|vh|vw|vmin|vmax|%|s|ms|deg|rad|turn|hz|khz|dpi|dpcm|dppx|fr|ch|ex)?\b/g,
+        /\b\d+(?:\.\d+)?(?:px|em|rem|vh|vw|vmin|vmax|%|s|ms|deg|rad|turn|hz|khz|dpi|dpcm|dppx|fr|ch|ex)?(?![\w-])/g,
       className: "nsh-number",
     },
     {

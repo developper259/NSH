@@ -3,6 +3,7 @@ export interface Token {
   value: string;
   line: number;
   column: number;
+  className?: string;
 }
 
 export interface TokenType {
