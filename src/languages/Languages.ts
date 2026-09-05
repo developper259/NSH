@@ -11,6 +11,7 @@ import { Java } from './Java';
 import { XML } from './XML';
 import { CPP } from './CPP';
 import { LanguageRegistry } from '../core/LanguageRegistry';
+import { C } from './C';
 
 export const languages: Record<string, LanguageDefinition> = {
   javascript: new JavaScript(),
@@ -24,6 +25,7 @@ export const languages: Record<string, LanguageDefinition> = {
   java: new Java(),
   xml: new XML(),
   cpp: new CPP(),
+  c: new C(),
 };
 
 export const defaultRegistry = new LanguageRegistry();
