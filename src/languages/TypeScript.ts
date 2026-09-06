@@ -210,12 +210,14 @@ export class TypeScript implements LanguageDefinition {
     },
     {
       name: "type-annotation",
-      pattern: /:\s*[A-Za-z_$][A-Za-z0-9_$]*(?:\s*<[^>]+>)?(?:\[\])?(?:\s*\|\s*[A-Za-z_$][A-Za-z0-9_$]*)*/g,
+      // Lowercase arbitrary identifiers after ':' are normally object values.
+      // Keep annotations to built-ins and conventional PascalCase user types.
+      pattern: /:\s*(?:string|number|boolean|bigint|symbol|any|unknown|never|void|null|undefined|object|[A-Z][A-Za-z0-9_$]*)(?:\s*<[^>]+>)?(?:\[\])?(?:\s*\|\s*(?:[A-Z][A-Za-z0-9_$]*|string|number|boolean|null|undefined))*/g,
       className: "nsh-keyword",
     },
     {
       name: "generic",
-      pattern: /(?<=[A-Za-z_$])<[A-Z][A-Za-z0-9_,\s<>]*>/g,
+      pattern: /(?<=[A-Z][A-Za-z0-9_$])<[A-Za-z_$][A-Za-z0-9_$,\s<>]*>|(?<=[a-z][A-Za-z0-9_$])<[A-Za-z_$][A-Za-z0-9_$,\s<>]*>(?=\s*\()/g,
       className: "nsh-keyword",
     },
     createFunctionToken(),
@@ -298,12 +300,12 @@ export class TypeScript implements LanguageDefinition {
         },
         {
           name: "type-annotation",
-          pattern: /:\s*[A-Za-z_$][A-Za-z0-9_$]*(?:\s*<[^>]+>)?(?:\[\])?(?:\s*\|\s*[A-Za-z_$][A-Za-z0-9_$]*)*/g,
+          pattern: /:\s*(?:string|number|boolean|bigint|symbol|any|unknown|never|void|null|undefined|object|[A-Z][A-Za-z0-9_$]*)(?:\s*<[^>]+>)?(?:\[\])?(?:\s*\|\s*(?:[A-Z][A-Za-z0-9_$]*|string|number|boolean|null|undefined))*/g,
           className: "nsh-keyword",
         },
         {
           name: "generic",
-          pattern: /(?<=[A-Za-z_$])<[A-Z][A-Za-z0-9_,\s<>]*>/g,
+          pattern: /(?<=[A-Z][A-Za-z0-9_$])<[A-Za-z_$][A-Za-z0-9_$,\s<>]*>|(?<=[a-z][A-Za-z0-9_$])<[A-Za-z_$][A-Za-z0-9_$,\s<>]*>(?=\s*\()/g,
           className: "nsh-keyword",
         },
         createFunctionToken(),
@@ -314,7 +316,7 @@ export class TypeScript implements LanguageDefinition {
           className: "nsh-bracket",
         },
         { name: "spread", pattern: /\.\.\./g, className: "nsh-operator" },
-        { name: "non-null", pattern: /!/g, className: "nsh-operator" },
+        // Long comparison operators must be considered before postfix `!`.
         {
           name: "optional-chaining",
           pattern: /\?\?=?|\?\./g,
@@ -325,6 +327,7 @@ export class TypeScript implements LanguageDefinition {
           pattern: /\?\?=?|\?\.|=>|===|!==|==|!=|<=|>=|\+\+|--|&&|\|\||\*\*|[+\-*/%=<>!&|^~?:;,.]/g,
           className: "nsh-operator",
         },
+        { name: "non-null", pattern: /!(?![=])/g, className: "nsh-operator" },
         createVariableToken(),
         {
           name: "jsx-tag",

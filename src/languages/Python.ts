@@ -226,13 +226,13 @@ export class Python implements LanguageDefinition {
         },
         {
           name: "string",
-          pattern: /f"/g,
+          pattern: /(?:[fF][rR]?|[rR][fF])"/g,
           className: "nsh-string",
           push: "inFStringDouble",
         },
         {
           name: "string",
-          pattern: /f'/g,
+          pattern: /(?:[fF][rR]?|[rR][fF])'/g,
           className: "nsh-string",
           push: "inFStringSingle",
         },
@@ -330,20 +330,22 @@ export class Python implements LanguageDefinition {
         },
       ],
       inFStringDouble: [
+        { name: "string", pattern: /\\[\s\S]/g, className: "nsh-string" },
         { name: "string", pattern: /"/g, className: "nsh-string", pop: true },
         { name: "fstring-expression", pattern: /\{[^{}]*\}/g, className: "nsh-variable" },
         {
           name: "string",
-          pattern: /\{\{|\}\}|[^"{]+/g,
+          pattern: /\{\{|\}\}|[^"{\\]+/g,
           className: "nsh-string",
         },
       ],
       inFStringSingle: [
+        { name: "string", pattern: /\\[\s\S]/g, className: "nsh-string" },
         { name: "string", pattern: /'/g, className: "nsh-string", pop: true },
         { name: "fstring-expression", pattern: /\{[^{}]*\}/g, className: "nsh-variable" },
         {
           name: "string",
-          pattern: /\{\{|\}\}|[^'{]+/g,
+          pattern: /\{\{|\}\}|[^'{\\]+/g,
           className: "nsh-string",
         },
       ],

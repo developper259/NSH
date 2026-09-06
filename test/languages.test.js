@@ -138,6 +138,21 @@ test("TypeScript avoids greedy annotations and false generics", () => {
   );
 });
 
+test("TypeScript distinguishes object values, annotations, comparisons, and non-null", () => {
+  const tokenizer = new Tokenizer(new TypeScript());
+  const objectTokens = tokenizer.tokenize("const user = { name: value, age: count };");
+  assert.equal(objectTokens.some((token) => token.type === "type-annotation"), false);
+  const annotations = tokenizer.tokenize("const name: string = 'x'; let list: Array<string>; interface User { age?: number; }");
+  assert.ok(annotations.filter((token) => token.type === "type-annotation").length >= 3);
+  assert.equal(tokenizer.tokenize("a < b > c").some((token) => token.type === "generic"), false);
+  assert.ok(tokenizer.tokenize("Array<string>; foo<Bar>()").some((token) => token.type === "generic"));
+  for (const value of ["!=", "!=="]) {
+    const tokens = tokenizer.tokenize(`a ${value} b`);
+    assert.ok(tokens.some((token) => token.type === "operator" && token.value === value));
+    assert.equal(tokens.some((token) => token.type === "non-null"), false);
+  }
+});
+
 test("Python exposes f-string expressions and modern numbers", () => {
   const tokens = new Tokenizer(new Python()).tokenize('f"Hello {user.name}" 1.2e-5');
   assert.equal(
@@ -148,6 +163,19 @@ test("Python exposes f-string expressions and modern numbers", () => {
     tokens.some((token) => token.value === "1.2e-5"),
     true,
   );
+});
+
+test("Python f-string prefixes and escaped quotes retain the f-string state", () => {
+  const tokenizer = new Tokenizer(new Python());
+  for (const source of [
+    'f"hello \\"world\\" {name}"',
+    "f'hello \\\'world\\\' {name}'",
+    'F"{value}"', 'fr"{path}"', 'rf"{path}"',
+  ]) {
+    const result = tokenizer.tokenizeWithState(source);
+    assert.deepEqual(result.finalStateStack, ["root"], source);
+    assert.ok(result.tokens.some((token) => token.type === "fstring-expression"), source);
+  }
 });
 
 test("CSS, JSON, and parser preserve their basic contracts", () => {
