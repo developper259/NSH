@@ -174,7 +174,8 @@ export class TypeScript implements LanguageDefinition {
     {
       name: "type",
       pattern: new RegExp(`\\b(${this.tsTypes.join("|")})\\b`, "g"),
-      className: "nsh-keyword",
+      className: "nsh-type",
+          context: isRootTypeReference,
     },
     {
       name: "builtin",
@@ -248,11 +249,18 @@ export class TypeScript implements LanguageDefinition {
   public getStates(): Record<string, TokenType[]> {
     return {
       root: [
+        {
+          name: "function",
+          pattern: /[A-Za-z_$][A-Za-z0-9_$]*(?=\s*\()/g,
+          className: "nsh-function",
+          context: isAfterDot,
+        },
         createKeywordToken(this.tsKeywords),
         {
           name: "type",
           pattern: new RegExp(`\\b(${this.tsTypes.join("|")})\\b`, "g"),
-          className: "nsh-keyword",
+          className: "nsh-type",
+          context: isRootTypeReference,
         },
         {
           name: "builtin",
@@ -300,6 +308,20 @@ export class TypeScript implements LanguageDefinition {
           name: "type-separator",
           pattern: /:/g,
           className: "nsh-operator",
+          context: isReturnTypeStart,
+          push: "inReturnType",
+        },
+        {
+          name: "type-separator",
+          pattern: /:/g,
+          className: "nsh-operator",
+          context: isParameterTypeStart,
+          push: "inParameterType",
+        },
+        {
+          name: "type-separator",
+          pattern: /:/g,
+          className: "nsh-operator",
           context: isTypeAnnotationStart,
           push: "inType",
         },
@@ -325,6 +347,12 @@ export class TypeScript implements LanguageDefinition {
           push: "inType",
         },
         createFunctionToken(),
+        {
+          name: "property",
+          pattern: /[A-Za-z_$][A-Za-z0-9_$]*/g,
+          className: "nsh-property",
+          context: isAfterDot,
+        },
         { name: "arrow-function", pattern: /=>/g, className: "nsh-operator" },
         {
           name: "bracket",
@@ -339,7 +367,7 @@ export class TypeScript implements LanguageDefinition {
         },
         {
           name: "operator",
-          pattern: /\?\?=?|\?\.|=>|===|!==|==|!=|<=|>=|\+\+|--|&&|\|\||\*\*|[+\-*/%=<>!&|^~?:;,.]/g,
+          pattern: /\?\?=?|\?\.|=>|===|!==|==|!=|<=|>=|\+\+|--|&&|\|\||\*\*|[+\-*/%=<>&|^~?:;,.]/g,
           className: "nsh-operator",
         },
         { name: "non-null", pattern: /!(?![=])/g, className: "nsh-operator" },
@@ -354,7 +382,7 @@ export class TypeScript implements LanguageDefinition {
         {
           name: "type",
           pattern: /[A-Za-z_$][A-Za-z0-9_$]*/g,
-          className: "nsh-keyword",
+          className: "nsh-type",
         },
         { name: "number", pattern: /\d+/g, className: "nsh-number" },
         {
@@ -387,11 +415,62 @@ export class TypeScript implements LanguageDefinition {
           push: "inTypeObject",
         },
       ],
+      inReturnType: [
+        {
+          name: "type",
+          pattern: /[A-Za-z_$][A-Za-z0-9_$]*/g,
+          className: "nsh-type",
+        },
+        { name: "number", pattern: /\d+/g, className: "nsh-number" },
+        {
+          name: "type-separator",
+          pattern: /</g,
+          className: "nsh-operator",
+          push: "inTypeNested",
+        },
+        {
+          name: "type-separator",
+          pattern: /[>\[\]|&,?():]/g,
+          className: "nsh-operator",
+        },
+        {
+          name: "bracket",
+          pattern: /\{/g,
+          className: "nsh-bracket",
+          pop: true,
+        },
+        {
+          name: "operator",
+          pattern: /[;=]/g,
+          className: "nsh-operator",
+          pop: true,
+        },
+      ],
+      inParameterType: [
+        {
+          name: "type",
+          pattern: /[A-Za-z_$][A-Za-z0-9_$]*/g,
+          className: "nsh-type",
+        },
+        { name: "number", pattern: /\d+/g, className: "nsh-number" },
+        {
+          name: "type-separator",
+          pattern: /</g,
+          className: "nsh-operator",
+          push: "inTypeNested",
+        },
+        {
+          name: "type-separator",
+          pattern: /[>\[\]|&,?()]/g,
+          className: "nsh-operator",
+          pop: true,
+        },
+      ],
       inTypeNested: [
         {
           name: "type",
           pattern: /[A-Za-z_$][A-Za-z0-9_$]*/g,
-          className: "nsh-keyword",
+          className: "nsh-type",
         },
         { name: "number", pattern: /\d+/g, className: "nsh-number" },
         {
@@ -430,7 +509,7 @@ export class TypeScript implements LanguageDefinition {
           className: "nsh-bracket",
           pop: true,
         },
-        { name: "type", pattern: /[A-Za-z_$][A-Za-z0-9_$]*/g, className: "nsh-keyword" },
+        { name: "property", pattern: /[A-Za-z_$][A-Za-z0-9_$]*/g, className: "nsh-property" },
         { name: "operator", pattern: /[;,?]/g, className: "nsh-operator" },
       ],
       inInterfaceBody: [
@@ -446,7 +525,7 @@ export class TypeScript implements LanguageDefinition {
           className: "nsh-bracket",
           pop: true,
         },
-        { name: "variable", pattern: /[A-Za-z_$][A-Za-z0-9_$]*/g, className: "nsh-variable" },
+        { name: "property", pattern: /[A-Za-z_$][A-Za-z0-9_$]*/g, className: "nsh-property" },
         { name: "type-separator", pattern: /[;,?]/g, className: "nsh-operator" },
       ],
       inMultiLineComment: [
@@ -505,6 +584,57 @@ function isTypeAnnotationStart(
   return Boolean(tokens.length && tokens[tokens.length - 1].value === ")");
 }
 
+function isReturnTypeStart(
+  line: string,
+  position: number,
+  _tokens: Token[],
+  stateStack: string[],
+): boolean {
+  if (stateStack[stateStack.length - 1] !== "root") return false;
+  return /\)\s*$/.test(line.slice(0, position));
+}
+
+function isParameterTypeStart(
+  line: string,
+  position: number,
+  _tokens: Token[],
+  stateStack: string[],
+): boolean {
+  if (stateStack[stateStack.length - 1] !== "root") return false;
+  return /\b[A-Za-z_$][A-Za-z0-9_$]*\s*\([^{}]*[A-Za-z_$][A-Za-z0-9_$]*\??\s*$/.test(
+    line.slice(0, position),
+  );
+}
+
+function isRootTypeReference(
+  line: string,
+  position: number,
+  tokens: Token[],
+  stateStack: string[],
+): boolean {
+  if (stateStack[stateStack.length - 1] !== "root") return false;
+  const previous = tokens[tokens.length - 1]?.value;
+  const prefix = line.slice(0, position).trimEnd();
+  const suffix = line.slice(position);
+  return (
+    previous === "new" ||
+    previous === "<" ||
+    previous === "," ||
+    /\b(?:interface|class|extends|implements)\s*$/.test(prefix) ||
+    /^\s*</.test(suffix) ||
+    /^[A-Za-z_$][A-Za-z0-9_$]*\s*</.test(suffix)
+  );
+}
+
+function isAfterDot(
+  _line: string,
+  _position: number,
+  tokens: Token[],
+  _stateStack: string[],
+): boolean {
+  return tokens[tokens.length - 1]?.value === ".";
+}
+
 function isGenericStart(
   line: string,
   position: number,
@@ -514,6 +644,9 @@ function isGenericStart(
   if (stateStack[stateStack.length - 1] !== "root") return false;
 
   const prefix = line.slice(0, position).trimEnd();
+  if (/^<\s*[A-Za-z_$][A-Za-z0-9_$]*(?:\s*,[^>]*)?\s*>\s*\(/.test(line.slice(position))) {
+    return true;
+  }
   return (
     /\b(?:function|class|interface|type)\s+[A-Za-z_$][A-Za-z0-9_$]*$/.test(prefix) ||
     tokens[tokens.length - 1]?.type === "type"

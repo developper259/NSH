@@ -287,7 +287,7 @@ test("TypeScript avoids greedy annotations and false generics", () => {
     tokenizer
       .tokenize("foo<Bar>()")
       .some((token) => token.type === "type-separator"),
-    false,
+    true,
   );
 });
 
@@ -325,6 +325,116 @@ test("TypeScript distinguishes object values, annotations, comparisons, and non-
       false,
     );
   }
+});
+
+test("TypeScript return type exits before function body", () => {
+  const source = `
+public parse(): ParsedCode {
+  const linesMap = new Map<number, Token[]>();
+
+  for (const token of this.tokens) {
+    if (!linesMap.has(token.line)) {
+      linesMap.set(token.line, []);
+    }
+
+    linesMap.get(token.line)!.push(token);
+  }
+}
+`;
+  const result = new Tokenizer(new TypeScript()).tokenizeWithState(source);
+  const first = (value) => result.tokens.find((token) => token.value === value);
+  assert.deepEqual(result.finalStateStack, ["root"]);
+  assert.equal(first("ParsedCode").type, "type");
+  assert.equal(first("linesMap").type, "variable");
+  assert.equal(first("token").type, "variable");
+  assert.equal(first("tokens").type, "property");
+  assert.equal(first("line").type, "property");
+  for (const token of result.tokens.filter((item) => ["linesMap", "token"].includes(item.value))) {
+    assert.ok(!["type", "keyword"].includes(token.type), `${token.value} leaked into ${token.type}`);
+  }
+});
+
+test("TypeScript local variables remain variables after return type", () => {
+  const tokens = tokensFor(TypeScript, "function f(): Result { const local = value; }");
+  for (const value of ["local", "value"]) {
+    assert.equal(tokens.find((token) => token.value === value).type, "variable");
+  }
+});
+
+test("TypeScript nested generic type tokens are structural", () => {
+  const tokens = tokensFor(TypeScript, "const value: Promise<Result<Map<string, User[]>>>;");
+  assert.equal(tokens.filter((token) => token.type === "generic").length, 0);
+  for (const value of ["Promise", "Result", "Map", "string", "User"]) {
+    assert.equal(tokens.find((token) => token.value === value).type, "type");
+  }
+  for (const token of tokens.filter((item) => ["<", ">", ",", "[", "]"].includes(item.value))) {
+    assert.equal(token.type, "type-separator");
+    assert.equal(token.className, "nsh-operator");
+  }
+});
+
+test("TypeScript type separators are not keyword colored", () => {
+  const tokens = tokensFor(TypeScript, "const CLASS_MAP: Readonly<Record<string, string>> = {};");
+  for (const value of ["Readonly", "Record", "string"]) {
+    assert.equal(tokens.find((token) => token.value === value).className, "nsh-type");
+  }
+  for (const token of tokens.filter((item) => ["<", ">", ","].includes(item.value))) {
+    assert.equal(token.type, "type-separator");
+    assert.notEqual(token.className, "nsh-keyword");
+  }
+});
+
+test("TypeScript generic vs comparison", () => {
+  const tokenizer = new Tokenizer(new TypeScript());
+  assert.equal(tokenizer.tokenize("foo<Bar>()").find((token) => token.value === "<").type, "type-separator");
+  for (const source of ["a < b", "a > b", "a < b > c", "if (a < b && c > d) {}"])
+    assert.equal(tokenizer.tokenize(source).some((token) => token.type === "type-separator"), false, source);
+});
+
+test("TypeScript object literal values do not enter type state", () => {
+  const tokens = tokensFor(TypeScript, "const object = { name: value, age: count, user: currentUser };");
+  for (const value of ["object", "name", "age", "user", "value", "count", "currentUser"])
+    assert.equal(tokens.find((token) => token.value === value).type, "variable");
+});
+
+test("TypeScript properties after dot are not variables or types", () => {
+  const tokens = tokensFor(TypeScript, "this.tokens; token.line; linesMap.size; user.name; config.port;");
+  for (const value of ["tokens", "line", "size", "name", "port"])
+    assert.equal(tokens.find((token) => token.value === value).type, "property");
+});
+
+test("TypeScript method calls after dot are functions", () => {
+  const tokens = tokensFor(TypeScript, "linesMap.has(token.line); linesMap.set(token.line, []); linesMap.get(token.line); array.push(token);");
+  for (const value of ["has", "set", "get", "push"])
+    assert.equal(tokens.find((token) => token.value === value).type, "function");
+});
+
+test("TypeScript function parameters are variables", () => {
+  const tokens = tokensFor(TypeScript, "function foo(value: string, token: Token, options?: Readonly<Options>): Promise<Result> {}");
+  for (const value of ["value", "token", "options"])
+    assert.equal(tokens.find((token) => token.value === value).type, "variable");
+  for (const value of ["string", "Token", "Readonly", "Options", "Promise", "Result"])
+    assert.equal(tokens.find((token) => token.value === value).type, "type");
+});
+
+test("TypeScript interface properties remain properties", () => {
+  const tokens = tokensFor(TypeScript, "interface User { name: string; age?: number; metadata: Record<string, unknown>; }");
+  for (const value of ["name", "age", "metadata"])
+    assert.equal(tokens.find((token) => token.value === value).type, "property");
+});
+
+test("TypeScript type alias state does not leak", () => {
+  const result = new Tokenizer(new TypeScript()).tokenizeWithState("type ID = string;\nconst next = value;");
+  assert.equal(result.tokens.find((token) => token.value === "string").type, "type");
+  assert.equal(result.tokens.find((token) => token.value === "next").type, "variable");
+  assert.equal(result.tokens.find((token) => token.value === "value").type, "variable");
+  assert.deepEqual(result.finalStateStack, ["root"]);
+});
+
+test("TypeScript non-null does not break !==", () => {
+  const tokens = tokensFor(TypeScript, "linesMap.get(token.line)!.push(token); value !== null;");
+  assert.equal(tokens.find((token) => token.value === "!").type, "non-null");
+  assert.equal(tokens.find((token) => token.value === "!==").type, "operator");
 });
 
 test("Python exposes f-string expressions and modern numbers", () => {
