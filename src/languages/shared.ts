@@ -1,6 +1,5 @@
 import { TokenType } from '../types/token';
 
-// Token types communs à tous les langages
 export const COMMON_TOKEN_TYPES: TokenType[] = [
   {
     name: 'string',
@@ -24,7 +23,6 @@ export const COMMON_TOKEN_TYPES: TokenType[] = [
   }
 ];
 
-// Patterns de commentaires communs
 export const COMMENT_PATTERNS = {
   singleLine: {
     hash: /#.*$/gm,
@@ -38,7 +36,6 @@ export const COMMENT_PATTERNS = {
   }
 };
 
-// Patterns de strings communs
 export const STRING_PATTERNS = {
   singleQuote: /'(?:[^'\\]|\\.)*'/g,
   doubleQuote: /"(?:[^"\\]|\\.)*"/g,
@@ -47,7 +44,6 @@ export const STRING_PATTERNS = {
   tripleDouble: /"""[\s\S]*?"""/g
 };
 
-// Patterns de nombres communs
 export const NUMBER_PATTERNS = {
   bigint: /\b\d(?:_?\d)*n\b/g,
   hex: /\b0x[0-9a-fA-F](?:_?[0-9a-fA-F])*\b/g,
@@ -58,7 +54,6 @@ export const NUMBER_PATTERNS = {
   integer: /\b\d(?:_?\d)*\b/g
 };
 
-// Keywords communs
 export const COMMON_KEYWORDS = [
   'true', 'false', 'null', 'undefined', 'void',
   'if', 'else', 'for', 'while', 'do', 'switch',
@@ -68,7 +63,6 @@ export const COMMON_KEYWORDS = [
   'in', 'of', 'async', 'await', 'yield'
 ];
 
-// Built-in functions communes
 export const COMMON_BUILTINS = [
   'console', 'log', 'error', 'warn', 'info', 'debug',
   'Math', 'JSON', 'Object', 'Array', 'String', 'Number',
@@ -76,7 +70,6 @@ export const COMMON_BUILTINS = [
   'Map', 'Set', 'WeakMap', 'WeakSet', 'Proxy', 'Reflect'
 ];
 
-// Helpers pour créer des token types
 export function createKeywordToken(keywords: string[]): TokenType {
   return {
     name: 'keyword',

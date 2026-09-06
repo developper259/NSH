@@ -1,4 +1,3 @@
-// Core classes
 export { Tokenizer } from './core/Tokenizer';
 export { IncrementalDocument } from './core/IncrementalDocument';
 export { Parser } from './core/Parser';
@@ -7,7 +6,6 @@ export { ThemeManager } from './core/ThemeManager';
 export { LanguageRegistry } from './core/LanguageRegistry';
 
 
-// Language definitions
 export { JavaScript } from './languages/JavaScript';
 export { TypeScript } from './languages/TypeScript';
 export { Python } from './languages/Python';
@@ -21,7 +19,6 @@ export { Java } from './languages/Java';
 export { CPP } from './languages/CPP';
 export { C } from './languages/C';
 
-// Types
 export type { Token, TokenType } from './types/token';
 export type { CachedLineState, IncrementalUpdate } from './types/incremental';
 export type { ThemeInfo } from './types/theme';

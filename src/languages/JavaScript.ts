@@ -208,7 +208,7 @@ export class JavaScript implements LanguageDefinition {
     createCommentToken(COMMENT_PATTERNS.singleLine.doubleSlash),
     {
       name: "regex",
-      pattern: /\/[^/\n\\]*(?:\\.[^/\n\\]*)*\/[gimuy]*/g,
+      pattern: /\/[^/\n\\]*(?:\\.[^/\n\\]*)*\/[dgimsuvy]*/g,
       className: "nsh-string",
     },
     createFunctionToken(),
@@ -269,7 +269,7 @@ export class JavaScript implements LanguageDefinition {
         createCommentToken(COMMENT_PATTERNS.singleLine.doubleSlash),
         {
           name: "regex",
-          pattern: /\/[^/\n\\]*(?:\\.[^/\n\\]*)*\/[gimuy]*/g,
+          pattern: /\/[^/\n\\]*(?:\\.[^/\n\\]*)*\/[dgimsuvy]*/g,
           className: "nsh-string",
         },
         createFunctionToken(),

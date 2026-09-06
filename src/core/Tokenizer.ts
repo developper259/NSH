@@ -28,7 +28,9 @@ export class Tokenizer {
 
     for (let i = 0; i < lines.length; i++) {
       const result = this.tokenizeLine(lines[i], currentState, i);
-      allTokens.push(...result.tokens);
+      for (const token of result.tokens) {
+        allTokens.push(token);
+      }
       currentState = result.finalStateStack;
     }
     return { tokens: allTokens, finalStateStack: currentState };
@@ -55,8 +57,7 @@ export class Tokenizer {
       let matched = false;
 
       for (const rule of currentRules) {
-        if (rule.original.name === "regex" && previousToken &&
-          ["variable", "number", "string", "regex"].includes(previousToken.type)) {
+        if (rule.original.name === "regex" && !canStartRegex(previousToken)) {
           continue;
         }
 
@@ -137,4 +138,40 @@ function toStickyRegExp(pattern: RegExp): RegExp {
   }
 
   return new RegExp(pattern.source, `${pattern.flags.replace("g", "")}y`);
+}
+
+function canStartRegex(previousToken: Token | undefined): boolean {
+  if (!previousToken) return true;
+
+  switch (previousToken.type) {
+    case "keyword": {
+      return [
+        "return", "case", "throw", "else", "do", "yield", "await",
+        "of", "in", "new", "typeof", "instanceof", "delete", "void",
+        "if", "while", "for", "switch", "with",
+      ].includes(previousToken.value);
+    }
+    case "bracket": {
+      return ["(", "[", "{"].includes(previousToken.value);
+    }
+    case "operator": {
+      return !["++", "--", "."].includes(previousToken.value);
+    }
+    case "variable":
+    case "number":
+    case "string":
+    case "regex":
+    case "boolean":
+    case "builtin":
+    case "function":
+    case "type":
+    case "generic":
+    case "type-annotation":
+    case "non-null":
+    case "optional-chaining":
+    case "jsx-tag":
+      return false;
+    default:
+      return false;
+  }
 }

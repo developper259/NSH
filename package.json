@@ -5,29 +5,37 @@
   "license": "ISC",
   "author": "developper259",
   "type": "commonjs",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "main": "./dist/cjs/index.js",
+  "module": "./dist/esm/index.js",
+  "types": "./dist/types/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "require": "./dist/index.js"
+      "types": "./dist/types/index.d.ts",
+      "import": "./dist/esm/index.js",
+      "require": "./dist/cjs/index.js"
     },
     "./server": {
-      "types": "./dist/server.d.ts",
-      "require": "./dist/server.js"
+      "types": "./dist/types/server.d.ts",
+      "import": "./dist/esm/server.js",
+      "require": "./dist/cjs/server.js"
     },
     "./themes/*": "./dist/themes/*"
   },
   "files": ["dist", "README.md", "LICENSE"],
   "scripts": {
-    "clean": "rm -rf dist",
-    "build": "tsc && node scripts/copy-themes.js",
+    "clean": "node scripts/clean.js",
+    "build": "npm run clean && tsc -p tsconfig.cjs.json && tsc -p tsconfig.types.json && node scripts/build-esm-wrapper.js && node scripts/copy-themes.js",
+    "build:cjs": "tsc -p tsconfig.cjs.json",
+    "build:esm": "node scripts/build-esm-wrapper.js",
     "typecheck": "tsc --noEmit",
     "test": "npm run build && node --test test/*.test.js",
+    "test:package": "npm run build && node test/package.test.js",
     "benchmark": "npm run build && node benchmark/index.js",
-    "prepack": "npm run clean && npm run build",
+    "benchmark:smoke": "npm run build && node benchmark/smoke.js",
+    "prepack": "npm run build",
+    "prepare": "npm run build",
     "dev": "tsc --watch",
-    "start": "tsc && node dist/index.js",
+    "start": "tsc && node dist/cjs/index.js",
     "socket": "tsc && node test/index.js"
   },
   "dependencies": {

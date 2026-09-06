@@ -6,7 +6,6 @@ export class XML implements LanguageDefinition {
   name = "xml";
   extensions = [".xml", ".xsd", ".xsl", ".xslt", ".svg", ".rss", ".atom"];
 
-  // Nom de balise/attribut avec espace de noms optionnel : ns:local-name
   private nameSource = "[a-zA-Z_][a-zA-Z0-9_.-]*(?::[a-zA-Z_][a-zA-Z0-9_.-]*)?";
 
   public tokenTypes: TokenType[] = [
@@ -66,10 +65,6 @@ export class XML implements LanguageDefinition {
   }
 
   public getStates(): Record<string, TokenType[]> {
-    // Règles d'attributs, actives uniquement dans l'état "inTag" (jamais
-    // sur le texte hors-balise). Contrairement au HTML, un attribut XML
-    // doit toujours avoir une valeur : pas de règle "catch-all" pour un
-    // mot isolé.
     const tagAttributeRules: TokenType[] = [
       {
         name: "string",
@@ -125,16 +120,12 @@ export class XML implements LanguageDefinition {
           className: "nsh-string",
           push: "inCdata",
         },
-        // Balise fermante : entre dans "inTag" pour ne rien colorer
-        // au-delà (le texte hors-balise ne matche jamais les règles
-        // d'attributs).
         {
           name: "tag-close",
           pattern: new RegExp(`<\\/${this.nameSource}`, "g"),
           className: "nsh-keyword",
           push: "inTag",
         },
-        // Balise ouvrante : idem, pour gérer ses éventuels attributs.
         {
           name: "tag-open",
           pattern: new RegExp(`<${this.nameSource}`, "g"),
@@ -154,8 +145,6 @@ export class XML implements LanguageDefinition {
         },
       ],
 
-      // Contenu strictement à l'intérieur d'une balise, entre "<tag"/"</tag"
-      // et ">". Les règles d'attributs ne s'appliquent QUE ici.
       inTag: [
         {
           name: "tag-selfclose",
@@ -172,8 +161,6 @@ export class XML implements LanguageDefinition {
         ...tagAttributeRules,
       ],
 
-      // Valeur d'attribut entre guillemets doubles/simples, consommée
-      // caractère par caractère jusqu'au guillemet fermant.
       inDoubleQuote: [
         {
           name: "string",

@@ -1,4 +1,4 @@
-const { NSHServer } = require("../dist/core/Socket");
+const { NSHServer } = require("../dist/cjs/core/Socket");
 
 const nsh = new NSHServer();
 

@@ -1,35 +1,71 @@
 import { Tokenizer } from "./Tokenizer";
 import { CachedLineState, IncrementalUpdate } from "../types/incremental";
+import { Token } from "../types/token";
+
+interface InternalLineState {
+  text: string;
+  tokens: Token[];
+  stateBefore: string[];
+  stateAfter: string[];
+}
 
 export class IncrementalDocument {
   private readonly tokenizer: Tokenizer;
-  private lines: CachedLineState[] = [];
+  private lines: InternalLineState[] = [];
 
   constructor(tokenizer: Tokenizer, text = "") {
     this.tokenizer = tokenizer;
     this.setText(text);
   }
 
+  public getLineCount(): number {
+    return this.lines.length;
+  }
+
   public setText(text: string): void {
     const sourceLines = text.split("\n");
-    this.lines = this.buildLines(sourceLines, 0, ["root"]);
+    this.lines = this.buildLines(sourceLines, ["root"]);
   }
 
   public getText(): string {
-    return this.lines.map((line) => line.text).join("\n");
+    let text = "";
+    for (let index = 0; index < this.lines.length; index += 1) {
+      if (index > 0) text += "\n";
+      text += this.lines[index].text;
+    }
+    return text;
   }
 
-  public getLines(): CachedLineState[] {
-    return this.lines.map((line) => ({
-      ...line,
-      stateBefore: [...line.stateBefore],
-      stateAfter: [...line.stateAfter],
-      tokens: line.tokens.map((token) => ({ ...token })),
-    }));
+  public getTokens(): Token[] {
+    return this.getTokensForLines(0, this.lines.length);
   }
 
-  public getTokens(): import("../types/token").Token[] {
-    return this.lines.flatMap((line) => line.tokens.map((token) => ({ ...token })));
+  public getLine(index: number): CachedLineState {
+    if (!Number.isInteger(index) || index < 0 || index >= this.lines.length) {
+      throw new RangeError("line index is outside the document");
+    }
+    return this.toCachedLine(this.lines[index], index);
+  }
+
+  public getLines(start = 0, end = this.lines.length): CachedLineState[] {
+    validateRange(start, end, this.lines.length);
+    const result: CachedLineState[] = [];
+    for (let index = start; index < end; index += 1) {
+      result.push(this.toCachedLine(this.lines[index], index));
+    }
+    return result;
+  }
+
+  public getTokensForLines(start: number, end: number): Token[] {
+    validateRange(start, end, this.lines.length);
+    const result: Token[] = [];
+    for (let index = start; index < end; index += 1) {
+      const line = this.lines[index];
+      for (const token of line.tokens) {
+        result.push({ ...token, line: index + 1 });
+      }
+    }
+    return result;
   }
 
   public updateLines(
@@ -43,55 +79,122 @@ export class IncrementalDocument {
     if (!Number.isInteger(deletedLines) || deletedLines < 0) {
       throw new RangeError("deletedLines must be a non-negative integer");
     }
+    if (deletedLines > this.lines.length - startLine) {
+      throw new RangeError("deletedLines exceeds the document length");
+    }
 
-    const oldLines = this.lines;
-    const nextTexts = oldLines.map((line) => line.text);
-    nextTexts.splice(startLine, deletedLines, ...insertedLines);
+    const lineDelta = insertedLines.length - deletedLines;
 
-    const stateBefore = startLine === 0 ? ["root"] : oldLines[startLine - 1].stateAfter;
-    const rebuilt: CachedLineState[] = oldLines.slice(0, startLine);
+    if (
+      deletedLines === insertedLines.length &&
+      insertedLines.length > 0 &&
+      insertedLines.every((text, slot) => this.lines[startLine + slot].text === text)
+    ) {
+      const before = startLine === 0 ? ["root"] : this.lines[startLine - 1].stateAfter;
+      const afterStart = this.lines[startLine].stateBefore;
+      const statesMatch = sameState(before, afterStart);
+      if (statesMatch) {
+        return {
+          startLine,
+          deletedLines,
+          insertedLines: insertedLines.length,
+          retokenizedLines: 0,
+          changedStartLine: startLine,
+          changedEndLine: startLine,
+        };
+      }
+    }
+
+    const stateBefore = startLine === 0 ? ["root"] : this.lines[startLine - 1].stateAfter;
+    const replacement: InternalLineState[] = [];
     let retokenizedLines = 0;
     let state = [...stateBefore];
+    let changedEndLine = startLine;
 
-    for (let index = startLine; index < nextTexts.length; index += 1) {
-      const previous = oldLines[index];
-      const line = nextTexts[index];
-      const result = this.tokenizer.tokenizeLine(line, state, index);
-      const entry: CachedLineState = {
-        text: line,
+    for (let local = 0; local < insertedLines.length; local += 1) {
+      const newIndex = startLine + local;
+      const lineText = insertedLines[local];
+      const result = this.tokenizer.tokenizeLine(lineText, state, newIndex);
+      replacement.push({
+        text: lineText,
+        tokens: result.tokens,
+        stateBefore: [...state],
+        stateAfter: [...result.finalStateStack],
+      });
+      retokenizedLines += 1;
+      state = result.finalStateStack;
+      changedEndLine = newIndex + 1;
+    }
+
+    const oldLineCount = this.lines.length;
+    let newIndex = startLine + insertedLines.length;
+    const firstOldIndex = startLine + insertedLines.length - lineDelta;
+
+    for (
+      let oldIndex = firstOldIndex;
+      newIndex < oldLineCount + lineDelta && oldIndex >= 0 && oldIndex < oldLineCount;
+      oldIndex += 1, newIndex += 1
+    ) {
+      const oldLine = this.lines[oldIndex];
+      const lineText = oldLine.text;
+
+      const result = this.tokenizer.tokenizeLine(lineText, state, newIndex);
+      const entry: InternalLineState = {
+        text: lineText,
         tokens: result.tokens,
         stateBefore: [...state],
         stateAfter: [...result.finalStateStack],
       };
-      rebuilt.push(entry);
       retokenizedLines += 1;
       state = result.finalStateStack;
 
-      if (index >= startLine + insertedLines.length && previous &&
-        previous.text === line && sameState(previous.stateAfter, entry.stateAfter)) {
-        const remaining = nextTexts.slice(index + 1);
-        const oldRemaining = oldLines.slice(index + 1);
-        if (remaining.length === oldRemaining.length &&
-          remaining.every((text, offset) => text === oldRemaining[offset].text)) {
-          rebuilt.push(...oldRemaining.map((oldLine, offset) => cloneLine(oldLine, index + 1 + offset)));
-          break;
-        }
+      if (
+        oldLine.text === lineText &&
+        sameState(oldLine.stateBefore, entry.stateBefore) &&
+        sameState(oldLine.stateAfter, entry.stateAfter)
+      ) {
+        changedEndLine = newIndex;
+        break;
       }
+
+      replacement.push(entry);
+      changedEndLine = newIndex + 1;
     }
 
-    this.lines = rebuilt;
+    if (replacement.length > 0 || deletedLines > 0) {
+      const nextLineCount = this.lines.length - deletedLines + replacement.length;
+      const nextLines: InternalLineState[] = new Array(nextLineCount);
+
+      for (let i = 0; i < startLine; i += 1) {
+        nextLines[i] = this.lines[i];
+      }
+      for (let i = 0; i < replacement.length; i += 1) {
+        nextLines[startLine + i] = replacement[i];
+      }
+
+      const afterSource = startLine + deletedLines;
+      const afterTarget = startLine + replacement.length;
+      for (let i = afterSource; i < this.lines.length; i += 1) {
+        nextLines[afterTarget + (i - afterSource)] = this.lines[i];
+      }
+
+      this.lines = nextLines;
+    }
+
     return {
       startLine,
       deletedLines,
       insertedLines: insertedLines.length,
       retokenizedLines,
+      changedStartLine: startLine,
+      changedEndLine,
     };
   }
 
-  private buildLines(texts: string[], startLine: number, state: string[]): CachedLineState[] {
-    const result: CachedLineState[] = [];
+  private buildLines(texts: string[], state: string[]): InternalLineState[] {
+    const result: InternalLineState[] = [];
     let currentState = [...state];
-    for (let index = startLine; index < texts.length; index += 1) {
+    for (let index = 0; index < texts.length; index += 1) {
       const tokenized = this.tokenizer.tokenizeLine(texts[index], currentState, index);
       result.push({
         text: texts[index],
@@ -103,17 +206,23 @@ export class IncrementalDocument {
     }
     return result;
   }
+
+  private toCachedLine(line: InternalLineState, lineIndex: number): CachedLineState {
+    return {
+      text: line.text,
+      stateBefore: [...line.stateBefore],
+      stateAfter: [...line.stateAfter],
+      tokens: line.tokens.map((token) => ({ ...token, line: lineIndex + 1 })),
+    };
+  }
 }
 
 function sameState(left: string[], right: string[]): boolean {
   return left.length === right.length && left.every((value, index) => value === right[index]);
 }
 
-function cloneLine(line: CachedLineState, lineIndex: number): CachedLineState {
-  return {
-    text: line.text,
-    stateBefore: [...line.stateBefore],
-    stateAfter: [...line.stateAfter],
-    tokens: line.tokens.map((token) => ({ ...token, line: lineIndex + 1 })),
-  };
+function validateRange(start: number, end: number, length: number): void {
+  if (!Number.isInteger(start) || !Number.isInteger(end) || start < 0 || end < start || end > length) {
+    throw new RangeError("line range is outside the document");
+  }
 }

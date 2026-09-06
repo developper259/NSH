@@ -25,7 +25,22 @@ export class YAML implements LanguageDefinition {
       STRING_PATTERNS.singleQuote,
     ]),
     createKeywordToken(this.yamlKeywords),
-    createNumberToken([NUMBER_PATTERNS.integer, NUMBER_PATTERNS.decimal]),
+    createNumberToken([
+      NUMBER_PATTERNS.decimal,
+      NUMBER_PATTERNS.scientific,
+      NUMBER_PATTERNS.hex,
+      NUMBER_PATTERNS.integer,
+    ]),
+    {
+      name: "yaml-anchor",
+      pattern: /&[a-zA-Z0-9_-]+/g,
+      className: "nsh-function",
+    },
+    {
+      name: "yaml-alias",
+      pattern: /\*[a-zA-Z0-9_-]+/g,
+      className: "nsh-variable",
+    },
     {
       name: "yaml-key",
       pattern: /[a-zA-ZÀ-ÿ0-9_-]+(?=\s*:)/g,
@@ -49,7 +64,28 @@ export class YAML implements LanguageDefinition {
 
   public getStates(): Record<string, TokenType[]> {
     return {
-      root: this.tokenTypes,
+      root: [
+        {
+          name: "block-scalar-start",
+          pattern: /^(\s*)(?:[a-zA-ZÀ-ÿ0-9_-]+\s*:\s*)([|>])/gm,
+          className: "nsh-operator",
+          push: "inBlockScalar",
+        },
+        ...this.tokenTypes,
+      ],
+      inBlockScalar: [
+        {
+          name: "block-scalar-end",
+          pattern: /^(\S+.*)$/m,
+          className: "nsh-string",
+          pop: true,
+        },
+        {
+          name: "block-scalar",
+          pattern: /^[ \t]+.*$/gm,
+          className: "nsh-string",
+        },
+      ],
     };
   }
 

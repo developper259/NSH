@@ -12,4 +12,6 @@ export interface IncrementalUpdate {
   deletedLines: number;
   insertedLines: number;
   retokenizedLines: number;
+  changedStartLine: number;
+  changedEndLine: number;
 }

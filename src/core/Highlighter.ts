@@ -33,8 +33,10 @@ const CLASS_MAP: Readonly<Record<string, string>> = {
   property: "nsh-keyword", value: "nsh-string", "value-identifier": "nsh-string",
   color: "nsh-number", "hex-color": "nsh-number", "var-function": "nsh-variable",
   "at-rule": "nsh-keyword", important: "nsh-keyword", combinator: "nsh-operator",
-  "yaml-key": "nsh-variable", "yaml-value": "nsh-string", "json-key": "nsh-variable",
-  "php-open": "nsh-keyword", "php-close": "nsh-keyword",
+  "yaml-key": "nsh-variable", "yaml-value": "nsh-string", "yaml-anchor": "nsh-function",
+  "yaml-alias": "nsh-variable", "block-scalar": "nsh-string", "block-scalar-start": "nsh-operator",
+  "json-key": "nsh-variable",
+  "php-open": "nsh-keyword", "php-close": "nsh-keyword", "php-attribute": "nsh-function",
   "object-operator": "nsh-operator", "scope-resolution": "nsh-operator",
   "namespace-separator": "nsh-operator", "class-name": "nsh-variable",
   "xml-decl": "nsh-keyword",
@@ -49,8 +51,8 @@ export class Highlighter {
   private themeName: string;
   private options: HighlightOptions;
 
-  constructor(language: LanguageDefinition, options?: HighlightOptions) {
-    this.tokenizer = new Tokenizer(language);
+  constructor(language: LanguageDefinition, options?: HighlightOptions, tokenizer?: Tokenizer) {
+    this.tokenizer = tokenizer || new Tokenizer(language);
     this.themeName = options?.theme || "dark";
     this.options = options || {};
   }
@@ -158,7 +160,7 @@ export class Highlighter {
   }
 
   public setTheme(themeName: string): void {
-    this.themeName = themeName;
+    this.themeName = /^[A-Za-z0-9_-]+$/.test(themeName) ? themeName : "dark";
   }
 
   public getThemeName(): string {

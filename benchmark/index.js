@@ -1,10 +1,12 @@
 const { performance } = require("node:perf_hooks");
-const { Tokenizer } = require("../dist/core/Tokenizer");
-const { JavaScript } = require("../dist/languages/JavaScript");
-const { HTML } = require("../dist/languages/HTML");
-const { XML } = require("../dist/languages/XML");
-const { CSS } = require("../dist/languages/CSS");
-const { PHP } = require("../dist/languages/PHP");
+const { Tokenizer } = require("../dist/cjs/core/Tokenizer");
+const { IncrementalDocument } = require("../dist/cjs/core/IncrementalDocument");
+const { Highlighter } = require("../dist/cjs/core/Highlighter");
+const { JavaScript } = require("../dist/cjs/languages/JavaScript");
+const { HTML } = require("../dist/cjs/languages/HTML");
+const { XML } = require("../dist/cjs/languages/XML");
+const { CSS } = require("../dist/cjs/languages/CSS");
+const { PHP } = require("../dist/cjs/languages/PHP");
 
 const cases = [
   ["javascript", new JavaScript(), 1000, "const value = 123.45;\n"],
@@ -32,3 +34,22 @@ for (const [language, definition, repetitions, line] of cases) {
     `${language}\t${source.length}\t${iterations}\t${total.toFixed(2)} ms\t${(total / iterations).toFixed(2)}\t${tokens}`,
   );
 }
+
+const incrementalSource = Array.from({ length: 10000 }, (_, index) => `const value${index} = ${index};`).join("\n");
+const incrementalDocument = new IncrementalDocument(new Tokenizer(new JavaScript()), incrementalSource);
+for (const [name, startLine, deletedLines, insertedLines] of [
+  ["incremental-edit-middle-10k", 5000, 1, ["const changed = 1;"]],
+  ["insert-line-start-10k", 0, 0, ["const inserted = 1;"]],
+  ["delete-line-start-10k", 0, 1, []],
+]) {
+  const start = performance.now();
+  const update = incrementalDocument.updateLines(startLine, deletedLines, insertedLines);
+  console.log(`${name}\t${(performance.now() - start).toFixed(2)} ms\tretokenizedLines=${update.retokenizedLines}`);
+}
+
+const highlighter = new Highlighter(new JavaScript());
+const socketLikeStart = performance.now();
+for (let index = 0; index < 1000; index += 1) {
+  highlighter.highlightLine("const value = 1;", ["root"], index);
+}
+console.log(`highlightLine-1000\t${(performance.now() - socketLikeStart).toFixed(2)} ms`);

@@ -50,7 +50,6 @@ export class HTML implements LanguageDefinition {
       pattern: /(?<==\s*)[^\s"'<>=]+/g,
       className: "nsh-string",
     },
-    // Catch-all attribut booléen (required, disabled, checked...)
     {
       name: "attribute",
       pattern: /[a-zA-Z0-9_-]+/g,
@@ -210,6 +209,12 @@ export class HTML implements LanguageDefinition {
           pop: true,
         },
         {
+          name: "script-type-json",
+          pattern: /type\s*=\s*"application\/json"/gi,
+          className: "nsh-string",
+          push: "inScriptJsonTag",
+        },
+        {
           name: "tag-bracket",
           pattern: />/g,
           className: "nsh-keyword",
@@ -217,6 +222,35 @@ export class HTML implements LanguageDefinition {
           push: "js_root",
         },
         ...tagAttributeRules,
+      ],
+      inScriptJsonTag: [
+        {
+          name: "tag-selfclose",
+          pattern: /\/>/g,
+          className: "nsh-keyword",
+          pop: true,
+        },
+        {
+          name: "tag-bracket",
+          pattern: />/g,
+          className: "nsh-keyword",
+          pop: true,
+          push: "inJsonScript",
+        },
+        ...tagAttributeRules,
+      ],
+      inJsonScript: [
+        {
+          name: "script-end",
+          pattern: /<\/script\s*>/gi,
+          className: "nsh-keyword",
+          pop: true,
+        },
+        {
+          name: "json-text",
+          pattern: /(?:(?!<\/script\s*>).)+/g,
+          className: "nsh-string",
+        },
       ],
 
       inStyleTag: [

@@ -18,12 +18,10 @@ export function createEmbeddedStates(
       stateName === "root" ? `${prefix}root` : `${prefix}${stateName}`;
     const stateRules: TokenType[] = [];
 
-    if (stateName === "root") {
-      stateRules.push({
-        ...exitRule,
-        pop: true,
-      });
-    }
+    stateRules.push({
+      ...exitRule,
+      pop: true,
+    });
 
     for (const rule of rules) {
       const clonedRule: TokenType = { ...rule };

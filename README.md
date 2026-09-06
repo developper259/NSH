@@ -8,7 +8,15 @@ NSH (NDL Syntax Highlighter) is a TypeScript syntax-highlighting library for edi
 npm install nsh
 ```
 
-The core package works in Node, Electron, and browser bundlers. The optional WebSocket server is available from `nsh/server`.
+The package ships both CommonJS and ESM entry points, including type declarations. The core entry point works in Node, Electron main, Electron renderer, and browser bundlers; the optional Node-only WebSocket server is available from `nsh/server`.
+
+To pin a repository revision while developing NCE, install a commit from GitHub:
+
+```sh
+npm install github:developper259/NSH#<commit-sha>
+```
+
+Git installs run the `prepare` build lifecycle. Published npm packages and tarballs already contain `dist/`.
 
 ## Usage
 
@@ -22,11 +30,13 @@ console.log(result.tokens, result.html);
 
 `Tokenizer.tokenizeLine()` and `Highlighter.highlightLine()` accept a state stack for multiline constructs. `IncrementalDocument` caches line states and retokenizes only until state convergence after line edits.
 
+`IncrementalDocument` also exposes `getLine()`, `getLines(start, end)`, and `getTokensForLines(start, end)` for targeted editor reads. The WebSocket server supports `openDocument`, `updateDocument`, `getDocumentLines`, and `closeDocument`; document sessions are scoped to their connection.
+
 Custom languages can implement `LanguageDefinition`, then be registered with `Highlighter.registerLanguage()` or a `LanguageRegistry`. A token rule may provide its own `className`; semantic `Token.type` is preserved.
 
-Built-in languages: JavaScript, TypeScript, Python, HTML, CSS, JSON, YAML, PHP, Java, XML, and C++. JSX/TSX and SCSS/Sass are intentionally not advertised until their lexical support is complete.
+Built-in languages: JavaScript, TypeScript, Python, HTML, CSS, JSON, YAML, PHP, Java, XML, and C++. YAML support is experimental and intentionally lexical. JSX/TSX and SCSS/Sass are not advertised until their lexical support is complete.
 
-Themes are copied to `dist/themes/` during build. The generated HTML includes `nsh-theme-dark` or `nsh-theme-light` classes.
+Themes are copied to `dist/themes/` during build and are available as `nsh/themes/dark.css` and `nsh/themes/light.css`. Theme selectors are scoped by the `nsh-theme-dark` or `nsh-theme-light` class on the generated container, so both CSS files may be loaded together.
 
 ## Optional WebSocket server
 

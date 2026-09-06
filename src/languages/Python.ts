@@ -138,12 +138,6 @@ export class Python implements LanguageDefinition {
     },
     { name: "decorator", pattern: /@\w+(\.\w+)*/g, className: "nsh-function" },
     {
-      name: "fstring-start",
-      pattern: /[fF]["']/g,
-      className: "nsh-string",
-      push: "inFStringBody",
-    },
-    {
       name: "string",
       pattern:
         /("""[\s\S]*?"""|'''[\s\S]*?'''|f"[^"]*"|f'[^']*'|r"[^"]*"|r'[^']*'|b"[^"]*"|b'[^']*'|"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')/g,
@@ -166,13 +160,9 @@ export class Python implements LanguageDefinition {
     ]),
     createCommentToken(COMMENT_PATTERNS.singleLine.hash),
     {
-      name: "docstring",
-      pattern: /("""[\s\S]*?"""|'''[\s\S]*?''')/g,
-      className: "nsh-comment",
-    },
-    {
       name: "type-hint",
-      pattern: /:\s*[a-zA-Z_][a-zA-Z0-9_\[\],\s]*/g,
+      pattern:
+        /:\s*(?:[a-zA-Z_][a-zA-Z0-9_]*\s*(?:\[[^\]]*\])?\s*(?:\|\s*[a-zA-Z_][a-zA-Z0-9_]*\s*(?:\[[^\]]*\])?)*|list\[[^\]]*\]|dict\[[^\]]*\]|Callable\[[^\]]*\]|Optional\[[^\]]*\]|Tuple\[[^\]]*\]|Set\[[^\]]*\]|Any|None)(?=\s*(?:,|\)|=|:))/g,
       className: "nsh-keyword",
     },
     createFunctionToken(),
@@ -223,33 +213,34 @@ export class Python implements LanguageDefinition {
           className: "nsh-function",
         },
         {
-          name: "docstring",
+          name: "string",
           pattern: /"""/g,
-          className: "nsh-comment",
-          push: "inDocDouble",
-        },
-        {
-          name: "docstring",
-          pattern: /'''/g,
-          className: "nsh-comment",
-          push: "inDocSingle",
-        },
-        {
-          name: "fstring-start",
-          pattern: /[fF]["']/g,
           className: "nsh-string",
-          push: "inFStringBody",
+          push: "inTripleDouble",
+        },
+        {
+          name: "string",
+          pattern: /'''/g,
+          className: "nsh-string",
+          push: "inTripleSingle",
+        },
+        {
+          name: "string",
+          pattern: /f"/g,
+          className: "nsh-string",
+          push: "inFStringDouble",
+        },
+        {
+          name: "string",
+          pattern: /f'/g,
+          className: "nsh-string",
+          push: "inFStringSingle",
         },
         {
           name: "string",
           pattern:
-            /(f"[^"]*"|f'[^']*'|r"[^"]*"|r'[^']*'|b"[^"]*"|b'[^']*'|"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')/g,
+            /(r"[^"]*"|r'[^']*'|b"[^"]*"|b'[^']*'|"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')/g,
           className: "nsh-string",
-        },
-        {
-          name: "fstring-expression",
-          pattern: /\{[^}]*\}/g,
-          className: "nsh-variable",
         },
         createNumberToken([
           NUMBER_PATTERNS.hex,
@@ -264,7 +255,8 @@ export class Python implements LanguageDefinition {
         createCommentToken(COMMENT_PATTERNS.singleLine.hash),
         {
           name: "type-hint",
-          pattern: /:\s*[a-zA-Z_][a-zA-Z0-9_\[\],\s]*/g,
+          pattern:
+            /:\s*(?:[a-zA-Z_][a-zA-Z0-9_]*\s*(?:\[[^\]]*\])?\s*(?:\|\s*[a-zA-Z_][a-zA-Z0-9_]*\s*(?:\[[^\]]*\])?)*|list\[[^\]]*\]|dict\[[^\]]*\]|Callable\[[^\]]*\]|Optional\[[^\]]*\]|Tuple\[[^\]]*\]|Set\[[^\]]*\]|Any|None)(?=\s*(?:,|\)|=|:))/g,
           className: "nsh-keyword",
         },
         createFunctionToken(),
@@ -311,35 +303,48 @@ export class Python implements LanguageDefinition {
           className: "nsh-operator",
         },
       ],
-      inDocDouble: [
+      inTripleDouble: [
         {
-          name: "docstring",
+          name: "string",
           pattern: /"""/g,
-          className: "nsh-comment",
+          className: "nsh-string",
           pop: true,
         },
         {
-          name: "docstring",
+          name: "string",
           pattern: /(?:(?!""").)+/g,
-          className: "nsh-comment",
+          className: "nsh-string",
         },
       ],
-      inFStringBody: [
-        { name: "string", pattern: /["']/g, className: "nsh-string", pop: true },
-        { name: "fstring-expression", pattern: /\{[^}]*\}/g, className: "nsh-variable" },
-        { name: "string", pattern: /[^{}"']+/g, className: "nsh-string" },
-      ],
-      inDocSingle: [
+      inTripleSingle: [
         {
-          name: "docstring",
+          name: "string",
           pattern: /'''/g,
-          className: "nsh-comment",
+          className: "nsh-string",
           pop: true,
         },
         {
-          name: "docstring",
+          name: "string",
           pattern: /(?:(?!''').)+/g,
-          className: "nsh-comment",
+          className: "nsh-string",
+        },
+      ],
+      inFStringDouble: [
+        { name: "string", pattern: /"/g, className: "nsh-string", pop: true },
+        { name: "fstring-expression", pattern: /\{[^{}]*\}/g, className: "nsh-variable" },
+        {
+          name: "string",
+          pattern: /\{\{|\}\}|[^"{]+/g,
+          className: "nsh-string",
+        },
+      ],
+      inFStringSingle: [
+        { name: "string", pattern: /'/g, className: "nsh-string", pop: true },
+        { name: "fstring-expression", pattern: /\{[^{}]*\}/g, className: "nsh-variable" },
+        {
+          name: "string",
+          pattern: /\{\{|\}\}|[^'{]+/g,
+          className: "nsh-string",
         },
       ],
     };

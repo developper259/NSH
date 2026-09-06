@@ -193,19 +193,19 @@ export class TypeScript implements LanguageDefinition {
     },
     createNumberToken([
       NUMBER_PATTERNS.bigint,
-      NUMBER_PATTERNS.integer,
+      NUMBER_PATTERNS.scientific,
       NUMBER_PATTERNS.decimal,
       NUMBER_PATTERNS.hex,
       NUMBER_PATTERNS.binary,
       NUMBER_PATTERNS.octal,
-      NUMBER_PATTERNS.scientific,
+      NUMBER_PATTERNS.integer,
     ]),
     createCommentToken(COMMENT_PATTERNS.multiLine.slashStar),
     createCommentToken(COMMENT_PATTERNS.singleLine.doubleSlash),
     { name: "jsdoc", pattern: /\/\*\*[\s\S]*?\*\//g, className: "nsh-comment" },
     {
       name: "regex",
-      pattern: /\/[^/\n\\]*(?:\\.[^/\n\\]*)*\/[gimuy]*/g,
+      pattern: /\/[^/\n\\]*(?:\\.[^/\n\\]*)*\/[dgimsuvy]*/g,
       className: "nsh-string",
     },
     {
@@ -222,13 +222,17 @@ export class TypeScript implements LanguageDefinition {
     { name: "arrow-function", pattern: /=>/g, className: "nsh-operator" },
     { name: "bracket", pattern: /[\[\]\{\}\(\)]/g, className: "nsh-bracket" },
     { name: "spread", pattern: /\.\.\./g, className: "nsh-operator" },
+    { name: "non-null", pattern: /!/g, className: "nsh-operator" },
+    {
+      name: "optional-chaining",
+      pattern: /\?\?=?|\?\./g,
+      className: "nsh-operator",
+    },
     {
       name: "operator",
       pattern: /[+\-*/%=<>!&|^~?:;,.]/g,
       className: "nsh-operator",
     },
-    { name: "non-null", pattern: /!/g, className: "nsh-operator" },
-    { name: "optional-chaining", pattern: /\?\.?/g, className: "nsh-operator" },
     createVariableToken(),
     {
       name: "jsx-tag",
@@ -267,12 +271,12 @@ export class TypeScript implements LanguageDefinition {
         ]),
         createNumberToken([
           NUMBER_PATTERNS.bigint,
-          NUMBER_PATTERNS.integer,
+          NUMBER_PATTERNS.scientific,
           NUMBER_PATTERNS.decimal,
           NUMBER_PATTERNS.hex,
           NUMBER_PATTERNS.binary,
           NUMBER_PATTERNS.octal,
-          NUMBER_PATTERNS.scientific,
+          NUMBER_PATTERNS.integer,
         ]),
         {
           name: "jsdoc",
@@ -289,7 +293,7 @@ export class TypeScript implements LanguageDefinition {
         createCommentToken(COMMENT_PATTERNS.singleLine.doubleSlash),
         {
           name: "regex",
-          pattern: /\/[^/\n\\]*(?:\\.[^/\n\\]*)*\/[gimuy]*/g,
+          pattern: /\/[^/\n\\]*(?:\\.[^/\n\\]*)*\/[dgimsuvy]*/g,
           className: "nsh-string",
         },
         {
@@ -310,15 +314,15 @@ export class TypeScript implements LanguageDefinition {
           className: "nsh-bracket",
         },
         { name: "spread", pattern: /\.\.\./g, className: "nsh-operator" },
-        {
-          name: "operator",
-          pattern: /\?\?=?|\?\.|=>|===|!==|==|!=|<=|>=|\+\+|--|&&|\|\||\*\*|[+\-*/%=<>!&|^~?:;,.]/g,
-          className: "nsh-operator",
-        },
         { name: "non-null", pattern: /!/g, className: "nsh-operator" },
         {
           name: "optional-chaining",
-          pattern: /\?\.?/g,
+          pattern: /\?\?=?|\?\./g,
+          className: "nsh-operator",
+        },
+        {
+          name: "operator",
+          pattern: /\?\?=?|\?\.|=>|===|!==|==|!=|<=|>=|\+\+|--|&&|\|\||\*\*|[+\-*/%=<>!&|^~?:;,.]/g,
           className: "nsh-operator",
         },
         createVariableToken(),
