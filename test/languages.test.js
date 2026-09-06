@@ -269,14 +269,24 @@ test("JavaScript prioritizes modern numbers, spread, and division", () => {
 test("TypeScript avoids greedy annotations and false generics", () => {
   const tokenizer = new Tokenizer(new TypeScript());
   const annotation = tokenizer.tokenize("const x: number, y = 1;");
-  assert.ok(annotation.some((token) => token.type === "type" && token.value === "number"));
-  assert.ok(annotation.some((token) => token.type === "type-separator" && token.value === ":"));
+  assert.ok(
+    annotation.some(
+      (token) => token.type === "type" && token.value === "number",
+    ),
+  );
+  assert.ok(
+    annotation.some(
+      (token) => token.type === "type-separator" && token.value === ":",
+    ),
+  );
   assert.equal(
     tokenizer.tokenize("a < b > c").some((token) => token.type === "generic"),
     false,
   );
   assert.equal(
-    tokenizer.tokenize("foo<Bar>()").some((token) => token.type === "type-separator"),
+    tokenizer
+      .tokenize("foo<Bar>()")
+      .some((token) => token.type === "type-separator"),
     false,
   );
 });
@@ -293,14 +303,16 @@ test("TypeScript distinguishes object values, annotations, comparisons, and non-
   const annotations = tokenizer.tokenize(
     "const name: string = 'x'; let list: Array<string>; interface User { age?: number; }",
   );
-  assert.ok(
-    annotations.filter((token) => token.type === "type").length >= 3,
-  );
+  assert.ok(annotations.filter((token) => token.type === "type").length >= 3);
   assert.equal(
     tokenizer.tokenize("a < b > c").some((token) => token.type === "generic"),
     false,
   );
-  assert.ok(tokenizer.tokenize("Array<string>").some((token) => token.type === "type-separator"));
+  assert.ok(
+    tokenizer
+      .tokenize("Array<string>")
+      .some((token) => token.type === "type-separator"),
+  );
   for (const value of ["!=", "!=="]) {
     const tokens = tokenizer.tokenize(`a ${value} b`);
     assert.ok(
