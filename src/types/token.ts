@@ -10,6 +10,12 @@ export interface TokenType {
   name: string;
   pattern: RegExp;
   className?: string;
+  context?: (
+    line: string,
+    position: number,
+    tokens: Token[],
+    stateStack: string[],
+  ) => boolean;
   push?: string;
   pop?: boolean;
   /** Pop states through and including the named state. */

@@ -1,5 +1,5 @@
 import { LanguageDefinition } from "../types/language";
-import { TokenType } from "../types/token";
+import { Token, TokenType } from "../types/token";
 import {
   createKeywordToken,
   createFunctionToken,
@@ -209,16 +209,14 @@ export class TypeScript implements LanguageDefinition {
       className: "nsh-string",
     },
     {
-      name: "type-annotation",
-      // Lowercase arbitrary identifiers after ':' are normally object values.
-      // Keep annotations to built-ins and conventional PascalCase user types.
-      pattern: /:\s*(?:string|number|boolean|bigint|symbol|any|unknown|never|void|null|undefined|object|[A-Z][A-Za-z0-9_$]*)(?:\s*<[^>]+>)?(?:\[\])?(?:\s*\|\s*(?:[A-Z][A-Za-z0-9_$]*|string|number|boolean|null|undefined))*/g,
-      className: "nsh-keyword",
+      name: "type-separator",
+      pattern: /:/g,
+      className: "nsh-operator",
     },
     {
-      name: "generic",
-      pattern: /(?<=[A-Z][A-Za-z0-9_$])<[A-Za-z_$][A-Za-z0-9_$,\s<>]*>|(?<=[a-z][A-Za-z0-9_$])<[A-Za-z_$][A-Za-z0-9_$,\s<>]*>(?=\s*\()/g,
-      className: "nsh-keyword",
+      name: "type-separator",
+      pattern: /[<>]/g,
+      className: "nsh-operator",
     },
     createFunctionToken(),
     { name: "arrow-function", pattern: /=>/g, className: "nsh-operator" },
@@ -299,14 +297,32 @@ export class TypeScript implements LanguageDefinition {
           className: "nsh-string",
         },
         {
-          name: "type-annotation",
-          pattern: /:\s*(?:string|number|boolean|bigint|symbol|any|unknown|never|void|null|undefined|object|[A-Z][A-Za-z0-9_$]*)(?:\s*<[^>]+>)?(?:\[\])?(?:\s*\|\s*(?:[A-Z][A-Za-z0-9_$]*|string|number|boolean|null|undefined))*/g,
-          className: "nsh-keyword",
+          name: "type-separator",
+          pattern: /:/g,
+          className: "nsh-operator",
+          context: isTypeAnnotationStart,
+          push: "inType",
         },
         {
-          name: "generic",
-          pattern: /(?<=[A-Z][A-Za-z0-9_$])<[A-Za-z_$][A-Za-z0-9_$,\s<>]*>|(?<=[a-z][A-Za-z0-9_$])<[A-Za-z_$][A-Za-z0-9_$,\s<>]*>(?=\s*\()/g,
-          className: "nsh-keyword",
+          name: "bracket",
+          pattern: /\{/g,
+          className: "nsh-bracket",
+          context: isInterfaceBodyStart,
+          push: "inInterfaceBody",
+        },
+        {
+          name: "type-separator",
+          pattern: /</g,
+          className: "nsh-operator",
+          context: isGenericStart,
+          push: "inTypeNested",
+        },
+        {
+          name: "operator",
+          pattern: /=/g,
+          className: "nsh-operator",
+          context: isTypeAliasEquals,
+          push: "inType",
         },
         createFunctionToken(),
         { name: "arrow-function", pattern: /=>/g, className: "nsh-operator" },
@@ -316,7 +332,6 @@ export class TypeScript implements LanguageDefinition {
           className: "nsh-bracket",
         },
         { name: "spread", pattern: /\.\.\./g, className: "nsh-operator" },
-        // Long comparison operators must be considered before postfix `!`.
         {
           name: "optional-chaining",
           pattern: /\?\?=?|\?\./g,
@@ -334,6 +349,105 @@ export class TypeScript implements LanguageDefinition {
           pattern: /<\/?[a-zA-Z][a-zA-Z0-9]*/g,
           className: "nsh-keyword",
         },
+      ],
+      inType: [
+        {
+          name: "type",
+          pattern: /[A-Za-z_$][A-Za-z0-9_$]*/g,
+          className: "nsh-keyword",
+        },
+        { name: "number", pattern: /\d+/g, className: "nsh-number" },
+        {
+          name: "type-separator",
+          pattern: /</g,
+          className: "nsh-operator",
+          push: "inTypeNested",
+        },
+        {
+          name: "type-separator",
+          pattern: /[>\[\]|&,?()]/g,
+          className: "nsh-operator",
+        },
+        {
+          name: "operator",
+          pattern: /=>/g,
+          className: "nsh-operator",
+          pop: true,
+        },
+        {
+          name: "operator",
+          pattern: /[;=]/g,
+          className: "nsh-operator",
+          pop: true,
+        },
+        {
+          name: "bracket",
+          pattern: /[{}]/g,
+          className: "nsh-bracket",
+          push: "inTypeObject",
+        },
+      ],
+      inTypeNested: [
+        {
+          name: "type",
+          pattern: /[A-Za-z_$][A-Za-z0-9_$]*/g,
+          className: "nsh-keyword",
+        },
+        { name: "number", pattern: /\d+/g, className: "nsh-number" },
+        {
+          name: "type-separator",
+          pattern: /</g,
+          className: "nsh-operator",
+          push: "inTypeNested",
+        },
+        {
+          name: "type-separator",
+          pattern: />/g,
+          className: "nsh-operator",
+          pop: true,
+        },
+        {
+          name: "type-separator",
+          pattern: /[\[\]|&,?()]/g,
+          className: "nsh-operator",
+        },
+        {
+          name: "operator",
+          pattern: /=/g,
+          className: "nsh-operator",
+        },
+      ],
+      inTypeObject: [
+        {
+          name: "type-separator",
+          pattern: /:/g,
+          className: "nsh-operator",
+          push: "inType",
+        },
+        {
+          name: "bracket",
+          pattern: /}/g,
+          className: "nsh-bracket",
+          pop: true,
+        },
+        { name: "type", pattern: /[A-Za-z_$][A-Za-z0-9_$]*/g, className: "nsh-keyword" },
+        { name: "operator", pattern: /[;,?]/g, className: "nsh-operator" },
+      ],
+      inInterfaceBody: [
+        {
+          name: "type-separator",
+          pattern: /:/g,
+          className: "nsh-operator",
+          push: "inType",
+        },
+        {
+          name: "bracket",
+          pattern: /}/g,
+          className: "nsh-bracket",
+          pop: true,
+        },
+        { name: "variable", pattern: /[A-Za-z_$][A-Za-z0-9_$]*/g, className: "nsh-variable" },
+        { name: "type-separator", pattern: /[;,?]/g, className: "nsh-operator" },
       ],
       inMultiLineComment: [
         {
@@ -375,4 +489,57 @@ export class TypeScript implements LanguageDefinition {
 
   comments = { singleLine: "//", multiLine: { start: "/*", end: "*/" } };
   strings = { startEnd: ['"', "'", "`"], escapeChar: "\\" };
+}
+
+function isTypeAnnotationStart(
+  line: string,
+  position: number,
+  tokens: Token[],
+  stateStack: string[],
+): boolean {
+  if (stateStack[stateStack.length - 1] !== "root") return false;
+
+  const prefix = line.slice(0, position).trimEnd();
+  if (/(?:const|let|var)\s+[A-Za-z_$][A-Za-z0-9_$]*$/.test(prefix)) return true;
+  if (/(?:function\s+[A-Za-z_$][A-Za-z0-9_$]*(?:\s*<[^>]*>)?\s*\([^)]*|\)\s*)$/.test(prefix)) return true;
+  return Boolean(tokens.length && tokens[tokens.length - 1].value === ")");
+}
+
+function isGenericStart(
+  line: string,
+  position: number,
+  tokens: Token[],
+  stateStack: string[],
+): boolean {
+  if (stateStack[stateStack.length - 1] !== "root") return false;
+
+  const prefix = line.slice(0, position).trimEnd();
+  return (
+    /\b(?:function|class|interface|type)\s+[A-Za-z_$][A-Za-z0-9_$]*$/.test(prefix) ||
+    tokens[tokens.length - 1]?.type === "type"
+  );
+}
+
+function isTypeAliasEquals(
+  line: string,
+  position: number,
+  _tokens: Token[],
+  stateStack: string[],
+): boolean {
+  if (stateStack[stateStack.length - 1] !== "root") return false;
+  return /\btype\s+[A-Za-z_$][A-Za-z0-9_$]*(?:\s*<[^>]*>)?\s*$/.test(
+    line.slice(0, position),
+  );
+}
+
+function isInterfaceBodyStart(
+  line: string,
+  position: number,
+  _tokens: Token[],
+  stateStack: string[],
+): boolean {
+  if (stateStack[stateStack.length - 1] !== "root") return false;
+  return /\binterface\s+[A-Za-z_$][A-Za-z0-9_$]*(?:\s*<[^>]*>)?\s*$/.test(
+    line.slice(0, position),
+  );
 }

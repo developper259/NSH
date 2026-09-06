@@ -57,6 +57,13 @@ export class Tokenizer {
       let matched = false;
 
       for (const rule of currentRules) {
+        if (
+          rule.original.context &&
+          !rule.original.context(line, position, tokens, stateStack)
+        ) {
+          continue;
+        }
+
         if (rule.original.name === "regex" && !canStartRegex(previousToken)) {
           continue;
         }

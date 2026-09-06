@@ -23,8 +23,6 @@ export function createEmbeddedStates(
         ? { ...exitRule, popPrefix: prefix }
         : {
             ...exitRule,
-            // An embedded child may itself have pushed nested lexical states.
-            // A host closing tag leaves the complete embedded language.
             popTo: "root",
           },
     );

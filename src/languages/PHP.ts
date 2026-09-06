@@ -319,8 +319,6 @@ export class PHP implements LanguageDefinition {
 
     const mergedHtmlStates: Record<string, TokenType[]> = {};
     for (const [stateName, rules] of Object.entries(htmlStates)) {
-      // CSS declarations are a normal host context for PHP interpolation. Do
-      // not enter PHP from comment/string continuation states.
       const acceptsPhp = statesWithPhpEntry.has(stateName) || stateName === "css_inDeclaration";
       mergedHtmlStates[stateName] = acceptsPhp
         ? [phpOpenRule, ...rules]
