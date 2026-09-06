@@ -21,7 +21,11 @@
     },
     "./themes/*": "./dist/themes/*"
   },
-  "files": ["dist", "README.md", "LICENSE"],
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "clean": "node scripts/clean.js",
     "build": "npm run clean && tsc -p tsconfig.cjs.json && tsc -p tsconfig.types.json && node scripts/build-esm-wrapper.js && node scripts/copy-themes.js",
@@ -35,14 +39,15 @@
     "prepack": "npm run build",
     "prepare": "npm run build",
     "dev": "tsc --watch",
-    "start": "tsc && node dist/cjs/index.js",
-    "socket": "tsc && node test/index.js"
+    "start": "npm run build && node dist/cjs/index.js",
+    "socket": "npm run build && node test/index.js"
   },
   "dependencies": {
     "ws": "^8.21.1"
   },
   "devDependencies": {
     "@types/ws": "^8.18.1",
+    "esbuild": "^0.28.2",
     "typescript": "^7.0.2"
   }
 }

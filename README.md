@@ -34,7 +34,7 @@ console.log(result.tokens, result.html);
 
 Custom languages can implement `LanguageDefinition`, then be registered with `Highlighter.registerLanguage()` or a `LanguageRegistry`. A token rule may provide its own `className`; semantic `Token.type` is preserved.
 
-Built-in languages: JavaScript, TypeScript, Python, HTML, CSS, JSON, YAML, PHP, Java, XML, and C++. YAML support is experimental and intentionally lexical. JSX/TSX and SCSS/Sass are not advertised until their lexical support is complete.
+Stable built-in languages: JavaScript, TypeScript, Python, HTML, CSS, JSON, PHP, Java, XML, C, and C++. YAML is experimental and intentionally lexical. JSX/TSX and SCSS/Sass are not advertised until their lexical support is complete.
 
 Themes are copied to `dist/themes/` during build and are available as `nsh/themes/dark.css` and `nsh/themes/light.css`. Theme selectors are scoped by the `nsh-theme-dark` or `nsh-theme-light` class on the generated container, so both CSS files may be loaded together.
 
@@ -48,7 +48,7 @@ const port = await server.start();
 console.log(`ws://127.0.0.1:${port}`);
 ```
 
-The default port is selected by the operating system and the default host is `127.0.0.1`. A port can be forced with `new NSHServer(8080)` or with `{ port, host, maxPayload }`. `stop()` returns a Promise and `getPort()` returns `null` when the server is not listening.
+The default port is selected by the operating system and the default host is `127.0.0.1`. A port can be forced with `new NSHServer(8080)` or with `{ port, host, maxPayload }`. `maxPayload` defaults to 2 MiB to bound memory used by a connection; increase it explicitly when opening documents whose complete text exceeds that limit. `openDocument` sends the complete document text. `stop()` returns a Promise and `getPort()` returns `null` when the server is not listening.
 
 ## Development
 
@@ -59,4 +59,4 @@ npm run benchmark
 npm pack --dry-run
 ```
 
-The highlighter is lexical, not a compiler or AST parser. Context-sensitive constructs such as JavaScript regular expressions use a small lexical heuristic and may require a real parser for complete language semantics.
+NSH is a lexical syntax highlighter. It is not a full compiler, parser, or AST engine. Context-sensitive constructs such as JavaScript regular expressions use a small lexical heuristic and may require a real parser for complete language semantics.

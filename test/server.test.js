@@ -218,6 +218,44 @@ test("real socket: invalid lineIndex", async () => {
   }
 });
 
+test("real socket: invalid document update is contained and the connection survives", async () => {
+  const server = new NSHServer();
+  try {
+    await server.start();
+    const client = await connect(server);
+    assert.equal((await request(client, {
+      id: "open", requestType: "openDocument", documentId: "doc", language: "javascript", code: "const a = 1;",
+    })).success, true);
+    const invalid = await request(client, {
+      id: "bad", requestType: "updateDocument", documentId: "doc", startLine: 999999, deletedLines: 0, insertedLines: ["hello"],
+    });
+    assert.equal(invalid.success, false);
+    assert.equal(invalid.id, "bad");
+    const valid = await request(client, {
+      id: "good", requestType: "updateDocument", documentId: "doc", startLine: 0, deletedLines: 1, insertedLines: ["const b = 2;"],
+    });
+    assert.equal(valid.success, true);
+    client.close();
+  } finally { await server.stop(); }
+});
+
+test("real socket: every request type requires an id", async () => {
+  const server = new NSHServer();
+  try {
+    await server.start();
+    const client = await connect(server);
+    for (const payload of [
+      { requestType: "supportedLanguages" },
+      { requestType: "detectLanguage", ext: ".js" },
+      { requestType: "closeDocument", documentId: "doc" },
+      { requestType: "getDocumentLines", documentId: "doc", startLine: 0, endLine: 1 },
+    ]) {
+      assert.equal((await request(client, payload)).success, false);
+    }
+    client.close();
+  } finally { await server.stop(); }
+});
+
 test("real socket: unknown language", async () => {
   const server = new NSHServer();
   try {

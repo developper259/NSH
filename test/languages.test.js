@@ -191,6 +191,28 @@ test("class conversion is non-destructive and HTML uses custom classes", () => {
   assert.equal(converted[0].className, "my-custom-class");
   assert.match(highlighter.getHTML("hello"), /my-custom-class/);
 });
+
+test("HTML exits all embedded states and JSON script state", () => {
+  for (const [source, end] of [
+    ["<script>\n/* comment\n</script>\n<div>Hello</div>", "script-end"],
+    ["<script>\n`template\n</script>\n<div>Hello</div>", "script-end"],
+    ["<style>\n/* comment\n</style>\n<div>Hello</div>", "style-end"],
+    ["<script type=\"application/json\">\n{\"hello\": true}\n</script>\n<div>AFTER</div>", "script-end"],
+  ]) {
+    const result = new Tokenizer(new HTML()).tokenizeWithState(source);
+    assert.ok(result.tokens.some((token) => token.type === end));
+    assert.deepEqual(result.finalStateStack, ["root"]);
+    assert.ok(result.tokens.some((token) => token.type === "tag-open" && token.value === "<div"));
+  }
+});
+
+test("theme and custom token classes cannot inject HTML attributes", () => {
+  const language = { name: "unsafe", extensions: [".unsafe"], getTokenTypes: () => [{ name: "x", pattern: /x/g, className: 'safe bad\" onclick=\"x' }] };
+  const highlighter = new Highlighter(language, { theme: 'dark\" onclick=\"x' });
+  const html = highlighter.getHTML("x");
+  assert.match(html, /nsh-theme-dark/);
+  assert.doesNotMatch(html, /onclick/);
+});
 test("PHP decimal and scientific numbers are single tokens", () => {
   for (const code of ["<?php $value = 123.45; ?>", "<?php $value = 1e10; ?>", "<?php $value = 0xFF; ?>"]) {
     const tokens = tokensFor(PHP, code);

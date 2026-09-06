@@ -15,6 +15,11 @@ export class ThemeManager {
   }
 
   public getThemeCSS(name: string): string {
+    return this.getThemeClass(name);
+  }
+
+  /** Returns the CSS class associated with a theme. */
+  public getThemeClass(name: string): string {
     return this.themes.get(name) || '';
   }
 

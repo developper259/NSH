@@ -53,7 +53,7 @@ export class Highlighter {
 
   constructor(language: LanguageDefinition, options?: HighlightOptions, tokenizer?: Tokenizer) {
     this.tokenizer = tokenizer || new Tokenizer(language);
-    this.themeName = options?.theme || "dark";
+    this.themeName = normalizeThemeName(options?.theme);
     this.options = options || {};
   }
 
@@ -160,7 +160,7 @@ export class Highlighter {
   }
 
   public setTheme(themeName: string): void {
-    this.themeName = /^[A-Za-z0-9_-]+$/.test(themeName) ? themeName : "dark";
+    this.themeName = normalizeThemeName(themeName);
   }
 
   public getThemeName(): string {
@@ -199,16 +199,14 @@ export class Highlighter {
     }
 
     let position = 0;
-    const sortedTokens = [...lineTokens].sort((a, b) => a.column - b.column);
-
-    for (const token of sortedTokens) {
+    for (const token of lineTokens) {
       if (token.column > position + 1) {
         const plainText = line.substring(position, token.column - 1);
         html += this.escapeHtml(plainText);
         position = token.column - 1;
       }
 
-      const className = token.className || this.getCssClass(token.type);
+      const className = normalizeClassNames(token.className) || this.getCssClass(token.type);
       html += `<span class="${className}">${this.escapeHtml(token.value)}</span>`;
       position = token.column - 1 + token.value.length;
     }
@@ -242,4 +240,14 @@ export class Highlighter {
   private escapeHtml(text: string): string {
     return text.replace(/[&<>"']/g, (char) => HTML_ESCAPES[char]);
   }
+}
+
+function normalizeThemeName(themeName: unknown): string {
+  return typeof themeName === "string" && /^[A-Za-z0-9_-]+$/.test(themeName) ? themeName : "dark";
+}
+
+function normalizeClassNames(className: string | undefined): string {
+  if (!className) return "";
+  const classes = className.trim().split(/\s+/);
+  return classes.every((name) => /^[A-Za-z0-9_-]+$/.test(name)) ? classes.join(" ") : "";
 }

@@ -244,7 +244,7 @@ export class HTML implements LanguageDefinition {
           name: "script-end",
           pattern: /<\/script\s*>/gi,
           className: "nsh-keyword",
-          pop: true,
+          popTo: "root",
         },
         {
           name: "json-text",

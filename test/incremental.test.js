@@ -92,3 +92,31 @@ test("deleting a line in the middle does not retokenize the whole file", () => {
   assert.equal(document.getLine(0).text, "const value1 = 1;");
   assert.equal(document.getLine(9998).text, "const value9999 = 9999;");
 });
+
+test("propagating a multiline state to EOF never duplicates existing lines", () => {
+  const document = new IncrementalDocument(
+    new Tokenizer(new JavaScript()),
+    "/*\ncomment\n*/\nconst a = 1;\nconst b = 2;",
+  );
+  const update = document.updateLines(2, 1, ["still comment"]);
+  assert.equal(update.retokenizedLines, 3);
+  assert.equal(document.getLineCount(), 5);
+  assert.equal(document.getText(), "/*\ncomment\nstill comment\nconst a = 1;\nconst b = 2;");
+  assert.deepEqual(document.getLines().map((line) => line.stateAfter.at(-1)), [
+    "inMultiLineComment", "inMultiLineComment", "inMultiLineComment", "inMultiLineComment", "inMultiLineComment",
+  ]);
+});
+
+test("large edits preserve structural size and converge quickly", () => {
+  const source = Array.from({ length: 10000 }, (_, index) => `const value${index} = ${index};`).join("\n");
+  const document = new IncrementalDocument(new Tokenizer(new JavaScript()), source);
+  for (const [start, deleted, inserted, count] of [
+    [0, 0, ["const first = 0;"], 10001],
+    [0, 1, [], 10000],
+    [5000, 1, ["const changed = 1;"], 10000],
+  ]) {
+    const update = document.updateLines(start, deleted, inserted);
+    assert.equal(document.getLineCount(), count);
+    assert.ok(update.retokenizedLines < 10);
+  }
+});

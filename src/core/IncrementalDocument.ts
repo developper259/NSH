@@ -106,6 +106,8 @@ export class IncrementalDocument {
     }
 
     const stateBefore = startLine === 0 ? ["root"] : this.lines[startLine - 1].stateAfter;
+    // This contains both structurally inserted lines and retokenized old lines.
+    // It must therefore never be used to calculate the new document length.
     const replacement: InternalLineState[] = [];
     let retokenizedLines = 0;
     let state = [...stateBefore];
@@ -127,18 +129,17 @@ export class IncrementalDocument {
     }
 
     const oldLineCount = this.lines.length;
-    let newIndex = startLine + insertedLines.length;
-    const firstOldIndex = startLine + insertedLines.length - lineDelta;
+    let newWriteIndex = startLine + insertedLines.length;
+    let resumeOldIndex = startLine + deletedLines;
 
-    for (
-      let oldIndex = firstOldIndex;
-      newIndex < oldLineCount + lineDelta && oldIndex >= 0 && oldIndex < oldLineCount;
-      oldIndex += 1, newIndex += 1
+    for (;
+      resumeOldIndex < oldLineCount;
+      resumeOldIndex += 1, newWriteIndex += 1
     ) {
-      const oldLine = this.lines[oldIndex];
+      const oldLine = this.lines[resumeOldIndex];
       const lineText = oldLine.text;
 
-      const result = this.tokenizer.tokenizeLine(lineText, state, newIndex);
+      const result = this.tokenizer.tokenizeLine(lineText, state, newWriteIndex);
       const entry: InternalLineState = {
         text: lineText,
         tokens: result.tokens,
@@ -153,16 +154,16 @@ export class IncrementalDocument {
         sameState(oldLine.stateBefore, entry.stateBefore) &&
         sameState(oldLine.stateAfter, entry.stateAfter)
       ) {
-        changedEndLine = newIndex;
+        changedEndLine = newWriteIndex;
         break;
       }
 
       replacement.push(entry);
-      changedEndLine = newIndex + 1;
+      changedEndLine = newWriteIndex + 1;
     }
 
     if (replacement.length > 0 || deletedLines > 0) {
-      const nextLineCount = this.lines.length - deletedLines + replacement.length;
+      const nextLineCount = oldLineCount - deletedLines + insertedLines.length;
       const nextLines: InternalLineState[] = new Array(nextLineCount);
 
       for (let i = 0; i < startLine; i += 1) {
@@ -172,7 +173,9 @@ export class IncrementalDocument {
         nextLines[startLine + i] = replacement[i];
       }
 
-      const afterSource = startLine + deletedLines;
+      // resumeOldIndex points at the first old line which was not placed in the
+      // replacement (either because state converged or because we reached EOF).
+      const afterSource = resumeOldIndex;
       const afterTarget = startLine + replacement.length;
       for (let i = afterSource; i < this.lines.length; i += 1) {
         nextLines[afterTarget + (i - afterSource)] = this.lines[i];

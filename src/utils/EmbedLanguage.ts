@@ -20,7 +20,9 @@ export function createEmbeddedStates(
 
     stateRules.push({
       ...exitRule,
-      pop: true,
+      // An embedded child may itself have pushed nested lexical states.  A
+      // closing host tag must leave the whole child language, not only one.
+      popTo: "root",
     });
 
     for (const rule of rules) {

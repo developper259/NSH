@@ -12,4 +12,6 @@ export interface TokenType {
   className?: string;
   push?: string;
   pop?: boolean;
+  /** Pop states through and including the named state. */
+  popTo?: string;
 }

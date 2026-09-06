@@ -35,16 +35,18 @@ for (const [language, definition, repetitions, line] of cases) {
   );
 }
 
-const incrementalSource = Array.from({ length: 10000 }, (_, index) => `const value${index} = ${index};`).join("\n");
-const incrementalDocument = new IncrementalDocument(new Tokenizer(new JavaScript()), incrementalSource);
-for (const [name, startLine, deletedLines, insertedLines] of [
-  ["incremental-edit-middle-10k", 5000, 1, ["const changed = 1;"]],
-  ["insert-line-start-10k", 0, 0, ["const inserted = 1;"]],
-  ["delete-line-start-10k", 0, 1, []],
-]) {
-  const start = performance.now();
-  const update = incrementalDocument.updateLines(startLine, deletedLines, insertedLines);
-  console.log(`${name}\t${(performance.now() - start).toFixed(2)} ms\tretokenizedLines=${update.retokenizedLines}`);
+for (const size of [10000, 50000, 100000]) {
+  const source = Array.from({ length: size }, (_, index) => `const value${index} = ${index};`).join("\n");
+  for (const [operation, startLine, deletedLines, insertedLines] of [
+    ["edit-middle", Math.floor(size / 2), 1, ["const changed = 1;"]],
+    ["insert-start", 0, 0, ["const inserted = 1;"]],
+    ["delete-start", 0, 1, []],
+  ]) {
+    const document = new IncrementalDocument(new Tokenizer(new JavaScript()), source);
+    const start = performance.now();
+    const update = document.updateLines(startLine, deletedLines, insertedLines);
+    console.log(`incremental-${operation}\tlines=${size}\t${(performance.now() - start).toFixed(2)} ms\tretokenizedLines=${update.retokenizedLines}`);
+  }
 }
 
 const highlighter = new Highlighter(new JavaScript());

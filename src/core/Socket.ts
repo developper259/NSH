@@ -373,14 +373,18 @@ export class NSHServer {
       this.sendError(ws, request.id, "Invalid updateDocument request");
       return;
     }
-    const update = document.updateLines(request.startLine, request.deletedLines, request.insertedLines);
-    ws.send(JSON.stringify({
-      id: request.id,
-      success: true,
-      changedStartLine: update.changedStartLine,
-      changedEndLine: update.changedEndLine,
-      lines: document.getLines(update.changedStartLine, update.changedEndLine),
-    }));
+    try {
+      const update = document.updateLines(request.startLine, request.deletedLines, request.insertedLines);
+      ws.send(JSON.stringify({
+        id: request.id,
+        success: true,
+        changedStartLine: update.changedStartLine,
+        changedEndLine: update.changedEndLine,
+        lines: document.getLines(update.changedStartLine, update.changedEndLine),
+      }));
+    } catch (error) {
+      this.sendError(ws, request.id, error instanceof Error ? error.message : "Invalid document update");
+    }
   }
 
   private handleCloseDocument(ws: WebSocket, request: HighlightRequest): void {
@@ -437,6 +441,9 @@ function validateRequest(value: unknown): string {
   const request = value as Record<string, unknown>;
   if (typeof request.requestType !== "string" || !REQUEST_TYPES.has(request.requestType)) {
     return "Request not valid: unknown or missing requestType";
+  }
+  if (typeof request.id !== "string" || request.id.length === 0) {
+    return "Request not valid: id must be a non-empty string";
   }
 
   switch (request.requestType) {
@@ -508,6 +515,8 @@ function validateHighlightLine(request: Record<string, unknown>): string {
 }
 
 function validateDetectLanguage(request: Record<string, unknown>): string {
+  const base = validateIdAndBase(request);
+  if (base) return base;
   const found = [request.ext, request.path, request.fileName].some((value) => typeof value === "string" && value.length > 0);
   return found ? "" : "Request not valid: ext, path or fileName required";
 }
