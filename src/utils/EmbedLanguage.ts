@@ -4,7 +4,7 @@ import { TokenType } from "../types/token";
 export function createEmbeddedStates(
   options: EmbeddedLanguageOptions,
 ): Record<string, TokenType[]> {
-  const { language, exitRule, prefix } = options;
+  const { language, exitRule, prefix, exitMode = "host" } = options;
 
   const childStates =
     typeof language.getStates === "function"
@@ -18,12 +18,16 @@ export function createEmbeddedStates(
       stateName === "root" ? `${prefix}root` : `${prefix}${stateName}`;
     const stateRules: TokenType[] = [];
 
-    stateRules.push({
-      ...exitRule,
-      // An embedded child may itself have pushed nested lexical states.  A
-      // closing host tag must leave the whole child language, not only one.
-      popTo: "root",
-    });
+    stateRules.push(
+      exitMode === "parent"
+        ? { ...exitRule, popPrefix: prefix }
+        : {
+            ...exitRule,
+            // An embedded child may itself have pushed nested lexical states.
+            // A host closing tag leaves the complete embedded language.
+            popTo: "root",
+          },
+    );
 
     for (const rule of rules) {
       const clonedRule: TokenType = { ...rule };

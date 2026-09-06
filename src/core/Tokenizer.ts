@@ -86,6 +86,14 @@ export class Tokenizer {
             const target = stateStack.lastIndexOf(rule.original.popTo);
             stateStack.splice(target >= 0 ? target + 1 : 1);
           }
+          if (rule.original.popPrefix) {
+            while (
+              stateStack.length > 1 &&
+              stateStack[stateStack.length - 1].startsWith(rule.original.popPrefix)
+            ) {
+              stateStack.pop();
+            }
+          }
           if (rule.original.push) {
             stateStack.push(rule.original.push);
           }

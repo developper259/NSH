@@ -282,6 +282,15 @@ export class CSS implements LanguageDefinition {
         this.numberRule,
         this.stringRule,
         this.valueIdentifierRule,
+        // Nested at-rules and keyframes can open declarations while an outer
+        // declaration block is active. Keep one lexical state per `{` so the
+        // matching `}` cannot return to selector mode too early.
+        {
+          name: "block-start",
+          pattern: /{/g,
+          className: "nsh-operator",
+          push: "inDeclaration",
+        },
         {
           name: "block-end",
           pattern: /}/g,

@@ -14,4 +14,6 @@ export interface TokenType {
   pop?: boolean;
   /** Pop states through and including the named state. */
   popTo?: string;
+  /** Pop only the contiguous embedded states with this prefix. */
+  popPrefix?: string;
 }

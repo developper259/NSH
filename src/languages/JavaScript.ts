@@ -308,8 +308,9 @@ export class JavaScript implements LanguageDefinition {
       inTemplate: [
         {
           name: "template-expression",
-          pattern: /\$\{[^}]*\}/g,
+          pattern: /\$\{/g,
           className: "nsh-variable",
+          push: "inTemplateExpression",
         },
         { name: "string", pattern: /`/g, className: "nsh-string", pop: true },
         {
@@ -317,6 +318,27 @@ export class JavaScript implements LanguageDefinition {
           pattern: /([^`$]|\$(?!\{))+/g,
           className: "nsh-string",
         },
+      ],
+      // A deliberately small lexical expression state. It tracks ordinary
+      // braces, which is enough to avoid treating object literals and calls
+      // inside ${...} as the end of a template expression.
+      inTemplateExpression: [
+        { name: "bracket", pattern: /\{/g, className: "nsh-bracket", push: "inTemplateBrace" },
+        { name: "template-expression", pattern: /\}/g, className: "nsh-variable", pop: true },
+        createStringToken([STRING_PATTERNS.singleQuote, STRING_PATTERNS.doubleQuote]),
+        createNumberToken([NUMBER_PATTERNS.scientific, NUMBER_PATTERNS.decimal, NUMBER_PATTERNS.integer]),
+        { name: "bracket", pattern: /[\[\]\(\)]/g, className: "nsh-bracket" },
+        { name: "operator", pattern: /[+\-*/%=<>!&|^~?:;,.]/g, className: "nsh-operator" },
+        createVariableToken(),
+      ],
+      inTemplateBrace: [
+        { name: "bracket", pattern: /\{/g, className: "nsh-bracket", push: "inTemplateBrace" },
+        { name: "bracket", pattern: /\}/g, className: "nsh-bracket", pop: true },
+        createStringToken([STRING_PATTERNS.singleQuote, STRING_PATTERNS.doubleQuote]),
+        createNumberToken([NUMBER_PATTERNS.scientific, NUMBER_PATTERNS.decimal, NUMBER_PATTERNS.integer]),
+        { name: "bracket", pattern: /[\[\]\(\)]/g, className: "nsh-bracket" },
+        { name: "operator", pattern: /[+\-*/%=<>!&|^~?:;,.]/g, className: "nsh-operator" },
+        createVariableToken(),
       ],
     };
   }

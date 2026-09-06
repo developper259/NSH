@@ -206,6 +206,25 @@ test("HTML exits all embedded states and JSON script state", () => {
   }
 });
 
+test("PHP interpolation restores the exact HTML, JavaScript, and CSS parent state", () => {
+  const tokenizer = new Tokenizer(new PHP());
+  const cases = [
+    ['<div title="Hello <?= $name ?> world">', ["root"]],
+    ['<div class="<?= $active ? \'active\' : \'\' ?>">Hello</div>', ["root"]],
+    ["<script>\nconst value = <?= $value ?>;\nconsole.log(value);\n</script>", ["root"]],
+    ["<style>\n.foo {\n color: <?= $color ?>;\n}\n</style>", ["root"]],
+  ];
+  for (const [source, expected] of cases) {
+    const result = tokenizer.tokenizeWithState(source);
+    assert.deepEqual(result.finalStateStack, expected, source);
+    assert.ok(result.tokens.some((token) => token.type === "php-close"), source);
+  }
+  const attribute = tokenizer.tokenizeLine('<?= $name ?>', ["root", "inTag", "inDoubleQuote", "php_root"], 0);
+  assert.deepEqual(attribute.finalStateStack, ["root", "inTag", "inDoubleQuote"]);
+  const script = tokenizer.tokenizeLine("<?= $value ?>;", ["root", "js_root"], 0);
+  assert.deepEqual(script.finalStateStack, ["root", "js_root"]);
+});
+
 test("theme and custom token classes cannot inject HTML attributes", () => {
   const language = { name: "unsafe", extensions: [".unsafe"], getTokenTypes: () => [{ name: "x", pattern: /x/g, className: 'safe bad\" onclick=\"x' }] };
   const highlighter = new Highlighter(language, { theme: 'dark\" onclick=\"x' });
@@ -276,6 +295,18 @@ test("CSS !important and variables", () => {
   assert.ok(tokens.some((token) => token.value === "--color"), "CSS variable missed");
 });
 
+test("CSS nested blocks retain declaration state until the matching brace", () => {
+  for (const source of [
+    "@media (min-width: 700px) {\n  .foo { color: red; }\n}",
+    "@supports (display: grid) {\n  .foo { display: grid; }\n}",
+    "@keyframes fade { from { opacity: 0; } to { opacity: 1; } }",
+  ]) {
+    const result = new Tokenizer(new CSS()).tokenizeWithState(source);
+    assert.deepEqual(result.finalStateStack, ["root"], source);
+    assert.ok(result.tokens.filter((token) => token.type === "property").length > 0, source);
+  }
+});
+
 test("JSON numbers: decimal, negative, exponent", () => {
   const tokens = tokensFor(JSONLang, '{"a": 12.5, "b": -3, "c": 1e-9}');
   const numbers = tokens.filter((token) => token.type === "number");
@@ -308,6 +339,15 @@ test("JavaScript template strings and comments", () => {
   const tokens = tokensFor(JavaScript, "const t = `hello ${name}`; // trailing\n/* block */");
   assert.ok(tokens.some((token) => token.type === "string" && token.value === "`"), "template not handled");
   assert.ok(tokens.some((token) => token.type === "comment"), "comment missed");
+});
+
+test("JavaScript template expressions tolerate nested object braces", () => {
+  const tokenizer = new Tokenizer(new JavaScript());
+  for (const source of ["`${{ a: 1 }.a}`", "`${foo({ a: 1 })}`"]) {
+    const result = tokenizer.tokenizeWithState(source);
+    assert.deepEqual(result.finalStateStack, ["root"], source);
+    assert.ok(result.tokens.some((token) => token.type === "template-expression" && token.value === "}"), source);
+  }
 });
 
 test("HTML plain text, attributes, script, style", () => {
