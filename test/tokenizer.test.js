@@ -218,6 +218,33 @@ test("escapes keyword alternatives and rejects capturing patterns in combiners",
   assert.throws(() => createStringToken([/(a)b/g]), /capturing groups/);
 });
 
+test("clearCache recompiles a mutated language definition", () => {
+  let rules = [{ name: "word", pattern: /one/g }];
+  const language = {
+    name: "mutable",
+    extensions: [".mutable"],
+    getStates: () => ({ root: rules }),
+  };
+  const tokenizer = new Tokenizer(language);
+  assert.equal(tokenizer.tokenize("one").length, 1);
+  rules = [{ name: "word", pattern: /two/g }];
+  assert.equal(tokenizer.tokenize("two").length, 0);
+  tokenizer.clearCache();
+  assert.equal(tokenizer.tokenize("two").length, 1);
+});
+
+test("a missing popTo target leaves the state stack unchanged", () => {
+  const tokenizer = new Tokenizer(
+    languageFrom({
+      root: [{ name: "open", pattern: /\[/g, push: "inner" }],
+      inner: [{ name: "invalid", pattern: /x/g, popTo: "missing" }],
+    }),
+  );
+
+  const result = tokenizer.tokenizeWithState("[x");
+  assert.deepEqual(result.finalStateStack, ["root", "inner"]);
+});
+
 test("fuzz: random character soup never crashes or produces invalid tokens", () => {
   const { JavaScript } = require("../dist/cjs/languages/JavaScript");
   const tokenizer = new Tokenizer(new JavaScript());

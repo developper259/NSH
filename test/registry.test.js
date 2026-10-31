@@ -24,6 +24,11 @@ test("language registry resolves aliases, canonical names and extensions", () =>
   assert.equal(registry.getLanguage("CL").name, "CustomLang");
   assert.equal(registry.getLanguageByExtension("CUSTOM").name, "CustomLang");
   assert.deepEqual(registry.listLanguages(), ["CustomLang"]);
+
+  assert.equal(registry.removeLanguage("cl"), true);
+  assert.equal(registry.getLanguage("customlang"), undefined);
+  assert.equal(registry.getLanguageByExtension(".custom"), undefined);
+  assert.equal(registry.removeLanguage("missing"), false);
 });
 
 test("language registry rejects conflicting extensions and aliases", () => {

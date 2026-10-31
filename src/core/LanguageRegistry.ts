@@ -21,6 +21,16 @@ export class LanguageRegistry {
     return this.languages.get(canonical);
   }
 
+  public removeLanguage(name: string): boolean {
+    const normalized = name.toLowerCase();
+    const canonical = this.aliases.get(normalized) ?? normalized;
+    if (!this.languages.delete(canonical)) return false;
+    const indexes = buildIndexes(this.languages);
+    this.aliases = indexes.aliases;
+    this.extensions = indexes.extensions;
+    return true;
+  }
+
   public getLanguageByExtension(extension: string): LanguageDefinition | undefined {
     const canonical = this.extensions.get(normalizeExtension(extension));
     return canonical ? this.languages.get(canonical) : undefined;
