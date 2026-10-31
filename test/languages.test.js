@@ -791,6 +791,59 @@ test("PHP hash comment still works", () => {
   );
 });
 
+test("C and C++ continued strings keep their state", () => {
+  const source = 'const char *s = "line\\\ncontinued";\nint x = 1;';
+  for (const definition of [C, CPP]) {
+    const result = new Tokenizer(new definition()).tokenizeWithState(source);
+    assert.deepEqual(result.finalStateStack, ["root"], definition.name);
+    assert.ok(
+      result.tokens.some(
+        (token) => token.line === 3 && token.type === "type" && token.value === "int",
+      ),
+      definition.name,
+    );
+    assert.ok(
+      result.tokens.filter((token) => token.type === "string").length >= 3,
+      definition.name,
+    );
+  }
+});
+
+test("C++ raw strings keep their delimiter state", () => {
+  const cases = [
+    'auto s = R"(line\n?>\n)";\nint x = 1;',
+    'auto s = R"tag(a )tag b)tag";\nint x = 1;',
+  ];
+  for (const source of cases) {
+    const result = new Tokenizer(new CPP()).tokenizeWithState(source);
+    assert.deepEqual(result.finalStateStack, ["root"], source);
+    assert.ok(
+      result.tokens.some(
+        (token) => token.line > 1 && token.type === "type" && token.value === "int",
+      ),
+      source,
+    );
+  }
+});
+
+test("C++ comparisons are not generic arguments", () => {
+  const comparison = tokensFor(CPP, "if (a < b && c > d) { x(); }");
+  assert.equal(
+    comparison.filter((token) => token.type === "generic").length,
+    0,
+    "comparison was colored as generic",
+  );
+  const template = tokensFor(CPP, "template <typename T> T id(T x) { return x; }");
+  assert.ok(template.some((token) => token.type === "generic"));
+});
+
+test("Java annotation markers are reachable", () => {
+  const tokens = tokensFor(Java, "@\nclass A {}");
+  assert.ok(
+    tokens.some((token) => token.type === "annotation-marker" && token.value === "@"),
+  );
+});
+
 test("Java generics are detected but comparisons are not", () => {
   assertHas(
     Java,

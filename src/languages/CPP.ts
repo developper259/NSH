@@ -1,5 +1,5 @@
 import { LanguageDefinition } from "../types/language";
-import { TokenType } from "../types/token";
+import { StatePushResolver, Token, TokenType } from "../types/token";
 import {
   createKeywordToken,
   createFunctionToken,
@@ -296,10 +296,24 @@ export class CPP implements LanguageDefinition {
           pattern: new RegExp(`\\b(${this.cppBuiltins.join("|")})\\b`, "g"),
           className: "nsh-function",
         },
-        createStringToken([
-          STRING_PATTERNS.doubleQuote,
-          STRING_PATTERNS.singleQuote,
-        ]),
+        {
+          name: "string",
+          pattern: /\b(?:u8|u|U|L)?R"([^()\\\s]{0,16})\(/g,
+          className: "nsh-string",
+          push: rawStringPush,
+        },
+        {
+          name: "string",
+          pattern: /"/g,
+          className: "nsh-string",
+          push: "inDoubleString",
+        },
+        {
+          name: "string",
+          pattern: /'/g,
+          className: "nsh-string",
+          push: "inSingleString",
+        },
         createNumberToken([
           NUMBER_PATTERNS.hex,
           NUMBER_PATTERNS.binary,
@@ -324,6 +338,7 @@ export class CPP implements LanguageDefinition {
           name: "generic",
           pattern: /<[a-zA-Z0-9_,:\s<>\[\]*&]+>/g,
           className: "nsh-keyword",
+          context: isCppGeneric,
         },
         createFunctionToken(),
         {
@@ -357,9 +372,84 @@ export class CPP implements LanguageDefinition {
           className: "nsh-comment",
         },
       ],
+      inDoubleString: [
+        { name: "string", pattern: /"/g, className: "nsh-string", pop: true },
+        { name: "string", pattern: /\\[\s\S]/g, className: "nsh-string" },
+        { name: "string", pattern: /\\$/g, className: "nsh-string" },
+        { name: "string", pattern: /[^"\\]+/g, className: "nsh-string" },
+      ],
+      inSingleString: [
+        { name: "string", pattern: /'/g, className: "nsh-string", pop: true },
+        { name: "string", pattern: /\\[\s\S]/g, className: "nsh-string" },
+        { name: "string", pattern: /\\$/g, className: "nsh-string" },
+        { name: "string", pattern: /[^'\\]+/g, className: "nsh-string" },
+      ],
+      inRawString: [
+        {
+          name: "string",
+          pattern: /\)([^()\\\s]{0,16})"/g,
+          className: "nsh-string",
+          pop: true,
+          context: isRawStringTerminator,
+        },
+        { name: "string", pattern: /[^)]+/g, className: "nsh-string" },
+        { name: "string", pattern: /\)/g, className: "nsh-string" },
+      ],
     };
   }
 
   comments = { singleLine: "//", multiLine: { start: "/*", end: "*/" } };
   strings = { startEnd: ['"', "'"], escapeChar: "\\" };
+}
+
+const rawStringPush: StatePushResolver = (
+  _line,
+  _position,
+  _tokens,
+  _stateStack,
+  matched,
+) => {
+  const delimiter = matched.slice(matched.indexOf('R"') + 2, -1);
+  return `inRawString:${encodeURIComponent(delimiter)}`;
+};
+
+function isRawStringTerminator(
+  line: string,
+  position: number,
+  _tokens: Token[],
+  stateStack: string[],
+): boolean {
+  const currentState = stateStack[stateStack.length - 1];
+  const separator = currentState.lastIndexOf(":");
+  if (separator < 0) return false;
+  const delimiter = decodeURIComponent(currentState.slice(separator + 1));
+  const match = /^\)([^()\\\s]{0,16})"/.exec(line.slice(position));
+  return match !== null && match[1] === delimiter;
+}
+
+function isCppGeneric(
+  line: string,
+  position: number,
+  tokens: Token[],
+  _stateStack: string[],
+): boolean {
+  const match = /^<[a-zA-Z0-9_,:\s<>\[\]*&]+>/.exec(line.slice(position));
+  if (!match) return false;
+
+  const content = match[0].slice(1, -1);
+  if (/&&|\|\||==|!=|<=|>=|[=+\-/%!?]/.test(content)) return false;
+  if (!/\s/.test(content)) return true;
+
+  let previous: Token | undefined;
+  for (let index = tokens.length - 1; index >= 0; index -= 1) {
+    if (tokens[index].type !== "comment") {
+      previous = tokens[index];
+      break;
+    }
+  }
+  if (previous?.value === "template" || previous?.type === "type") return true;
+
+  const prefix = line.slice(0, position).trimEnd();
+  if (/\b(?:class|struct|typename|using|typedef)\b/.test(prefix)) return true;
+  return /[,:<>*&[\]]/.test(content);
 }

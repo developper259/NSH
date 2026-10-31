@@ -232,10 +232,18 @@ export class C implements LanguageDefinition {
           pattern: new RegExp(`\\b(${this.cBuiltins.join("|")})\\b`, "g"),
           className: "nsh-function",
         },
-        createStringToken([
-          STRING_PATTERNS.doubleQuote,
-          STRING_PATTERNS.singleQuote,
-        ]),
+        {
+          name: "string",
+          pattern: /"/g,
+          className: "nsh-string",
+          push: "inDoubleString",
+        },
+        {
+          name: "string",
+          pattern: /'/g,
+          className: "nsh-string",
+          push: "inSingleString",
+        },
         createNumberToken([
           NUMBER_PATTERNS.hex,
           NUMBER_PATTERNS.binary,
@@ -281,6 +289,18 @@ export class C implements LanguageDefinition {
           pattern: /(?:(?!\*\/).)+/g,
           className: "nsh-comment",
         },
+      ],
+      inDoubleString: [
+        { name: "string", pattern: /"/g, className: "nsh-string", pop: true },
+        { name: "string", pattern: /\\[\s\S]/g, className: "nsh-string" },
+        { name: "string", pattern: /\\$/g, className: "nsh-string" },
+        { name: "string", pattern: /[^"\\]+/g, className: "nsh-string" },
+      ],
+      inSingleString: [
+        { name: "string", pattern: /'/g, className: "nsh-string", pop: true },
+        { name: "string", pattern: /\\[\s\S]/g, className: "nsh-string" },
+        { name: "string", pattern: /\\$/g, className: "nsh-string" },
+        { name: "string", pattern: /[^'\\]+/g, className: "nsh-string" },
       ],
     };
   }

@@ -222,7 +222,7 @@ export class Java implements LanguageDefinition {
     { name: "bracket", pattern: /[\[\]\{\}\(\)]/g, className: "nsh-bracket" },
     {
       name: "operator",
-      pattern: /[+\-*/%=<>!&|^~?:;,.@]/g,
+      pattern: /[+\-*/%=<>!&|^~?:;,.]/g,
       className: "nsh-operator",
     },
     createVariableToken(),
@@ -306,8 +306,13 @@ export class Java implements LanguageDefinition {
         },
         {
           name: "operator",
-          pattern: /[+\-*/%=<>!&|^~?:;,.@]/g,
+          pattern: /[+\-*/%=<>!&|^~?:;,.]/g,
           className: "nsh-operator",
+        },
+        {
+          name: "annotation-marker",
+          pattern: /@/g,
+          className: "nsh-function",
         },
         createVariableToken(),
       ],
