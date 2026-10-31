@@ -6,6 +6,14 @@ export interface Token {
   className?: string;
 }
 
+export type StatePushResolver = (
+  line: string,
+  position: number,
+  tokens: Token[],
+  stateStack: string[],
+  matched: string,
+) => string | undefined;
+
 export interface TokenType {
   name: string;
   pattern: RegExp;
@@ -16,9 +24,9 @@ export interface TokenType {
     tokens: Token[],
     stateStack: string[],
   ) => boolean;
-  push?: string;
+  push?: string | StatePushResolver;
   pop?: boolean;
-  /** Pop states through and including the named state. */
+  /** Pop states until the named state is on top. The target is kept on the stack. */
   popTo?: string;
   /** Pop only the contiguous embedded states with this prefix. */
   popPrefix?: string;

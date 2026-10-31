@@ -6,8 +6,7 @@ function languageFrom(states) {
   return {
     name: "test",
     extensions: [".test"],
-    getTokenTypes: () => states.root,
-    getStates: states,
+    getStates: () => states,
   };
 }
 
@@ -110,6 +109,114 @@ test("modern regex flags are accepted", () => {
   const regexTokens = result.filter((token) => token.type === "regex");
   assert.equal(regexTokens.length, 1);
   assert.equal(regexTokens[0].value, "/abc/gimsdvy");
+});
+
+test("regex detection keeps statement and expression contexts distinct", () => {
+  const { JavaScript } = require("../dist/cjs/languages/JavaScript");
+  const tokenizer = new Tokenizer(new JavaScript());
+  const regexCases = [
+    "const x = 1; /* comment */ /re/.test(value);",
+    "if (value) /re/.test(value);",
+    "if (value) {} /re/.test(value);",
+    "while (value) /re/.test(value);",
+  ];
+  for (const source of regexCases) {
+    const tokens = tokenizer.tokenize(source);
+    assert.ok(
+      tokens.some((token) => token.type === "regex"),
+      `expected a regex token in: ${source}`,
+    );
+  }
+
+  const divisionCases = [
+    "foo() / 2 / 3",
+    "array[0] / 2",
+    "const value = {} / 2",
+    "const value = { a: 1 } / 2",
+    "const value = function () {} / 2",
+  ];
+  for (const source of divisionCases) {
+    const tokens = tokenizer.tokenize(source);
+    assert.equal(
+      tokens.filter((token) => token.type === "regex").length,
+      0,
+      `expected no regex token in: ${source}`,
+    );
+  }
+});
+
+test("caps the state stack at the configured depth", () => {
+  const tokenizer = new Tokenizer(
+    languageFrom({
+      root: [{ name: "open", pattern: /a/g, push: "nested" }],
+      nested: [{ name: "open", pattern: /a/g, push: "nested" }],
+    }),
+    { maxStateDepth: 10 },
+  );
+
+  const result = tokenizer.tokenizeWithState("a".repeat(100));
+  assert.equal(result.tokens.length, 100);
+  assert.ok(result.finalStateStack.length <= 10);
+  assert.equal(tokenizer.getMaxStateDepth(), 10);
+});
+
+test("supports zero-length state reductions without consuming characters", () => {
+  const tokenizer = new Tokenizer(
+    languageFrom({
+      root: [{ name: "open", pattern: /\[/g, push: "inner" }],
+      inner: [{ name: "close", pattern: /^/g, pop: true }],
+    }),
+  );
+
+  const result = tokenizer.tokenizeWithState("[\n]");
+  assert.deepEqual(result.finalStateStack, ["root"]);
+});
+
+test("supports dynamic push targets with parameterized state lookup", () => {
+  const tokenizer = new Tokenizer(
+    languageFrom({
+      root: [
+        {
+          name: "open",
+          pattern: /</g,
+          push: (_line, _position, _tokens, _stateStack, matched) =>
+            `inner:${matched.length}`,
+        },
+      ],
+      inner: [{ name: "close", pattern: />/g, pop: true }],
+    }),
+  );
+
+  const result = tokenizer.tokenizeWithState("<x>");
+  assert.deepEqual(result.finalStateStack, ["root"]);
+});
+
+test("does not skip whitespace when a rule can match it", () => {
+  const tokenizer = new Tokenizer(
+    languageFrom({
+      root: [
+        { name: "space", pattern: / +/g, className: "custom-space" },
+        { name: "word", pattern: /[a-z]+/g, className: "custom-word" },
+      ],
+    }),
+  );
+
+  assert.equal(tokenizer.tokenize("   ").length, 1);
+  const word = tokenizer.tokenize("   word").find((token) => token.type === "word");
+  assert.equal(word.column, 4);
+});
+
+test("escapes keyword alternatives and rejects capturing patterns in combiners", () => {
+  const { createKeywordToken, createStringToken } = require("../dist/cjs/languages/shared");
+  const tokenizer = new Tokenizer(
+    languageFrom({
+      root: [createKeywordToken(["c++", "a|b"])],
+    }),
+  );
+
+  const values = tokenizer.tokenize("c++ a|b").map((token) => token.value);
+  assert.deepEqual(values, ["c++", "a|b"]);
+  assert.throws(() => createStringToken([/(a)b/g]), /capturing groups/);
 });
 
 test("fuzz: random character soup never crashes or produces invalid tokens", () => {

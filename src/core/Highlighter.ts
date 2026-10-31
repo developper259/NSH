@@ -207,7 +207,8 @@ export class Highlighter {
       }
 
       const className = normalizeClassNames(token.className) || this.getCssClass(token.type);
-      html += `<span class="${className}">${this.escapeHtml(token.value)}</span>`;
+      const value = this.escapeHtml(token.value);
+      html += className ? `<span class="${className}">${value}</span>` : value;
       position = token.column - 1 + token.value.length;
     }
 

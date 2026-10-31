@@ -30,8 +30,21 @@ export function createEmbeddedStates(
     for (const rule of rules) {
       const clonedRule: TokenType = { ...rule };
 
-      if (clonedRule.push) {
-        clonedRule.push = `${prefix}${clonedRule.push}`;
+      if (clonedRule.push !== undefined) {
+        const push = clonedRule.push;
+        clonedRule.push =
+          typeof push === "string"
+            ? prefixStateName(push, prefix)
+            : (...args) => {
+                const pushed = push(...args);
+                return pushed === undefined ? undefined : prefixStateName(pushed, prefix);
+              };
+      }
+      if (clonedRule.popTo) {
+        clonedRule.popTo = prefixStateName(clonedRule.popTo, prefix);
+      }
+      if (clonedRule.popPrefix) {
+        clonedRule.popPrefix = `${prefix}${clonedRule.popPrefix}`;
       }
 
       stateRules.push(clonedRule);
@@ -41,4 +54,8 @@ export function createEmbeddedStates(
   }
 
   return embeddedStates;
+}
+
+function prefixStateName(stateName: string, prefix: string): string {
+  return stateName.startsWith(prefix) ? stateName : `${prefix}${stateName}`;
 }

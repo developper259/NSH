@@ -575,9 +575,9 @@ test("theme and custom token classes cannot inject HTML attributes", () => {
   const language = {
     name: "unsafe",
     extensions: [".unsafe"],
-    getTokenTypes: () => [
-      { name: "x", pattern: /x/g, className: 'safe bad\" onclick=\"x' },
-    ],
+    getStates: () => ({
+      root: [{ name: "x", pattern: /x/g, className: 'safe bad\" onclick=\"x' }],
+    }),
   };
   const highlighter = new Highlighter(language, {
     theme: 'dark\" onclick=\"x',

@@ -1,14 +1,45 @@
-import { Token } from "../types/token";
+import { Token, TokenType } from "../types/token";
 import { LanguageDefinition } from "../types/language";
+import {
+  BracketFrame,
+  BracketKind,
+  CompiledState,
+  TokenContext,
+  TokenizerOptions,
+} from "../types/tokenizer";
+
+const DEFAULT_MAX_STATE_DEPTH = 64;
+const DEFAULT_STATE = ["root"];
+const WHITESPACE_SAMPLES = [" ", "  ", "\t", "\t\t", "\r", "\r\n", " \t\n"];
+const REGEX_KEYWORDS = new Set([
+  "return", "case", "throw", "else", "do", "yield", "await",
+  "of", "in", "new", "typeof", "instanceof", "delete", "void",
+  "if", "while", "for", "switch", "with",
+]);
+const CONTROL_KEYWORDS = new Set(["if", "while", "for", "with", "switch", "catch"]);
+const BLOCK_KEYWORDS = new Set(["else", "do", "try", "finally"]);
+const OBJECT_KEYWORDS = new Set([
+  "return", "yield", "await", "case", "throw", "new", "typeof",
+  "instanceof", "in", "of", "delete", "void",
+]);
+const COMMENT_TOKEN_TYPES = new Set(["comment", "jsdoc", "docstring"]);
 
 export class Tokenizer {
   private language: LanguageDefinition;
-  private states: Record<string, CompiledTokenRule[]> | null = null;
+  private states: Record<string, CompiledState> | null = null;
+  private readonly maxStateDepth: number;
 
-  private static readonly DEFAULT_STATE: string[] = ["root"];
-
-  constructor(language: LanguageDefinition) {
+  constructor(language: LanguageDefinition, options: TokenizerOptions = {}) {
+    const maxStateDepth = options.maxStateDepth ?? DEFAULT_MAX_STATE_DEPTH;
+    if (!Number.isInteger(maxStateDepth) || maxStateDepth < 1) {
+      throw new RangeError("maxStateDepth must be a positive integer");
+    }
     this.language = language;
+    this.maxStateDepth = maxStateDepth;
+  }
+
+  public getMaxStateDepth(): number {
+    return this.maxStateDepth;
   }
 
   public tokenize(code: string): Token[] {
@@ -17,14 +48,11 @@ export class Tokenizer {
 
   public tokenizeWithState(
     code: string,
-    initialStateStack: string[] = Tokenizer.DEFAULT_STATE,
+    initialStateStack: string[] = DEFAULT_STATE,
   ): { tokens: Token[]; finalStateStack: string[] } {
     const lines = code.split("\n");
-    let currentState: string[] =
-      initialStateStack && initialStateStack.length > 0
-        ? [...initialStateStack]
-        : [...Tokenizer.DEFAULT_STATE];
-    let allTokens: Token[] = [];
+    let currentState = this.sanitizeStateStack(initialStateStack);
+    const allTokens: Token[] = [];
 
     for (let i = 0; i < lines.length; i++) {
       const result = this.tokenizeLine(lines[i], currentState, i);
@@ -43,20 +71,26 @@ export class Tokenizer {
   ): { tokens: Token[]; finalStateStack: string[] } {
     const tokens: Token[] = [];
     const states = this.getCompiledStates();
-
-    const stateStack =
-      initialStateStack && initialStateStack.length > 0
-        ? [...initialStateStack]
-        : [...Tokenizer.DEFAULT_STATE];
+    const stateStack = this.sanitizeStateStack(initialStateStack);
+    const context: TokenContext = {
+      regexAllowed: true,
+      previous: undefined,
+      beforePrevious: undefined,
+      brackets: [],
+      lastClosedParenControl: false,
+      lastClosedParenFunction: false,
+      lastClosedParenFunctionExpression: false,
+      lastClosedBraceBlock: false,
+      functionExpression: false,
+    };
     let position = 0;
-    let previousToken: Token | undefined;
 
     while (position < line.length) {
       const currentState = stateStack[stateStack.length - 1];
-      const currentRules = states[currentState] || states["root"] || [];
+      const compiledState = getCompiledState(states, currentState);
       let matched = false;
 
-      for (const rule of currentRules) {
+      for (const rule of compiledState.rules) {
         if (
           rule.original.context &&
           !rule.original.context(line, position, tokens, stateStack)
@@ -64,53 +98,74 @@ export class Tokenizer {
           continue;
         }
 
-        if (rule.original.name === "regex" && !canStartRegex(previousToken)) {
+        if (rule.original.name === "regex" && !context.regexAllowed) {
           continue;
         }
 
         rule.matcher.lastIndex = position;
         const match = rule.matcher.exec(line);
 
-        if (match) {
-          if (match[0].length === 0) continue;
+        if (!match) continue;
 
-          tokens.push({
-            type: rule.original.name,
-            value: match[0],
-            line: lineIndex + 1,
-            column: position + 1,
-            className: rule.original.className,
-          });
-          previousToken = tokens[tokens.length - 1];
-
-          position += match[0].length;
-          matched = true;
-
-          if (rule.original.pop && stateStack.length > 1) {
-            stateStack.pop();
+        if (match[0].length === 0) {
+          if (
+            rule.original.push ||
+            !(rule.original.pop || rule.original.popTo || rule.original.popPrefix)
+          ) {
+            continue;
           }
-          if (rule.original.popTo) {
-            const target = stateStack.lastIndexOf(rule.original.popTo);
-            stateStack.splice(target >= 0 ? target + 1 : 1);
+          const stateChanged = this.applyStateTransitions(
+            rule.original,
+            stateStack,
+            line,
+            position,
+            tokens,
+            "",
+            true,
+          );
+          if (stateChanged) {
+            matched = true;
+            break;
           }
-          if (rule.original.popPrefix) {
-            while (
-              stateStack.length > 1 &&
-              stateStack[stateStack.length - 1].startsWith(rule.original.popPrefix)
-            ) {
-              stateStack.pop();
-            }
-          }
-          if (rule.original.push) {
-            stateStack.push(rule.original.push);
-          }
-
-          break;
+          continue;
         }
+
+        const token: Token = {
+          type: rule.original.name,
+          value: match[0],
+          line: lineIndex + 1,
+          column: position + 1,
+          className: rule.original.className,
+        };
+        tokens.push(token);
+
+        this.applyStateTransitions(
+          rule.original,
+          stateStack,
+          line,
+          position,
+          tokens,
+          match[0],
+          false,
+        );
+        updateTokenContext(context, token, this.maxStateDepth);
+
+        position += match[0].length;
+        matched = true;
+        break;
       }
 
       if (!matched) {
-        position++;
+        if (
+          compiledState.canSkipWhitespace &&
+          isWhitespace(line[position])
+        ) {
+          do {
+            position += 1;
+          } while (position < line.length && isWhitespace(line[position]));
+        } else {
+          position += 1;
+        }
       }
     }
 
@@ -122,33 +177,236 @@ export class Tokenizer {
     this.states = null;
   }
 
-  private getCompiledStates(): Record<string, CompiledTokenRule[]> {
+  public clearCache(): void {
+    this.states = null;
+  }
+
+  private applyStateTransitions(
+    rule: TokenType,
+    stateStack: string[],
+    line: string,
+    position: number,
+    tokens: Token[],
+    matched: string,
+    requireReduction: boolean,
+  ): boolean {
+    const before = stateStack.join("\u0000");
+
+    if (rule.pop && stateStack.length > 1) {
+      stateStack.pop();
+    }
+    if (rule.popTo) {
+      const target = stateStack.lastIndexOf(rule.popTo);
+      if (target >= 0) {
+        stateStack.splice(target + 1);
+      }
+    }
+    if (rule.popPrefix) {
+      while (
+        stateStack.length > 1 &&
+        stateStack[stateStack.length - 1].startsWith(rule.popPrefix)
+      ) {
+        stateStack.pop();
+      }
+    }
+    if (rule.push && !requireReduction) {
+      const pushed =
+        typeof rule.push === "function"
+          ? rule.push(line, position, tokens, stateStack, matched)
+          : rule.push;
+      if (pushed && stateStack.length < this.maxStateDepth) {
+        stateStack.push(pushed);
+      }
+    }
+
+    return stateStack.join("\u0000") !== before;
+  }
+
+  private sanitizeStateStack(initialStateStack: string[]): string[] {
+    if (!initialStateStack || initialStateStack.length === 0) {
+      return [...DEFAULT_STATE];
+    }
+    if (initialStateStack.length <= this.maxStateDepth) {
+      return [...initialStateStack];
+    }
+    return initialStateStack.slice(0, this.maxStateDepth);
+  }
+
+  private getCompiledStates(): Record<string, CompiledState> {
     if (this.states) {
       return this.states;
     }
 
-    const rawStates =
-      typeof this.language.getStates === "function"
-        ? this.language.getStates()
-        : { root: this.language.getTokenTypes() };
-
+    const rawStates = this.language.getStates();
     this.states = Object.fromEntries(
-      Object.entries(rawStates).map(([stateName, rules]) => [
-        stateName,
-        rules.map((original) => ({
+      Object.entries(rawStates).map(([stateName, rules]) => {
+        const compiledRules = rules.map((original) => ({
           original,
           matcher: toStickyRegExp(original.pattern),
-        })),
-      ]),
+        }));
+        return [
+          stateName,
+          {
+            rules: compiledRules,
+            canSkipWhitespace: !compiledRules.some((rule) =>
+              WHITESPACE_SAMPLES.some((sample) => {
+                rule.matcher.lastIndex = 0;
+                const match = rule.matcher.exec(sample);
+                return match !== null && match[0].length > 0;
+              }),
+            ),
+          },
+        ];
+      }),
     );
 
     return this.states;
   }
 }
 
-interface CompiledTokenRule {
-  original: import("../types/token").TokenType;
-  matcher: RegExp;
+function getCompiledState(
+  states: Record<string, CompiledState>,
+  stateName: string,
+): CompiledState {
+  const exact = states[stateName];
+  if (exact) return exact;
+
+  const parameterSeparator = stateName.lastIndexOf(":");
+  if (parameterSeparator > 0) {
+    const base = states[stateName.slice(0, parameterSeparator)];
+    if (base) return base;
+  }
+
+  return states.root;
+}
+
+function updateTokenContext(
+  context: TokenContext,
+  token: Token,
+  maxStateDepth: number,
+): void {
+  if (COMMENT_TOKEN_TYPES.has(token.type) || token.type === "text") {
+    return;
+  }
+
+  if (token.type === "bracket") {
+    if (token.value === "(") {
+      context.brackets.push({
+        kind: "paren",
+        control:
+          context.previous?.type === "keyword" &&
+          CONTROL_KEYWORDS.has(context.previous.value),
+        functionParameters: isFunctionParameterStart(context),
+        functionExpression: context.functionExpression,
+      });
+      context.regexAllowed = true;
+    } else if (token.value === ")") {
+      const frame = popBracket(context.brackets, "paren");
+      context.lastClosedParenControl = frame?.control === true;
+      context.lastClosedParenFunction = frame?.functionParameters === true;
+      context.lastClosedParenFunctionExpression = frame?.functionExpression === true;
+      context.regexAllowed = context.lastClosedParenControl;
+    } else if (token.value === "[") {
+      context.brackets.push({ kind: "square" });
+      context.regexAllowed = true;
+    } else if (token.value === "]") {
+      popBracket(context.brackets, "square");
+      context.regexAllowed = false;
+    } else if (token.value === "{") {
+      const brace = classifyBrace(context);
+      context.brackets.push({ kind: "brace", block: brace.block, expression: brace.expression });
+      context.regexAllowed = true;
+    } else if (token.value === "}") {
+      const frame = popBracket(context.brackets, "brace");
+      context.lastClosedBraceBlock = frame?.block === true;
+      context.regexAllowed = frame?.block === true && frame?.expression !== true;
+    } else {
+      context.regexAllowed = false;
+    }
+  } else if (token.type === "template-expression") {
+    context.regexAllowed = token.value === "${";
+  } else if (token.type === "keyword") {
+    if (token.value === "function") {
+      context.functionExpression = isFunctionExpressionContext(context);
+    }
+    context.regexAllowed = REGEX_KEYWORDS.has(token.value);
+  } else if (token.type === "operator") {
+    context.regexAllowed = !["++", "--", "."].includes(token.value);
+  } else {
+    context.regexAllowed = false;
+  }
+
+  context.beforePrevious = context.previous;
+  context.previous = token;
+
+  const maxBracketDepth = Math.max(1, maxStateDepth);
+  if (context.brackets.length > maxBracketDepth) {
+    context.brackets.splice(0, context.brackets.length - maxBracketDepth);
+  }
+}
+
+function isFunctionParameterStart(context: TokenContext): boolean {
+  if (context.previous?.type === "keyword" && context.previous.value === "function") {
+    return true;
+  }
+  return (
+    context.previous?.type === "variable" &&
+    context.beforePrevious?.type === "keyword" &&
+    context.beforePrevious.value === "function"
+  );
+}
+
+function classifyBrace(context: TokenContext): { block: boolean; expression: boolean } {
+  const previous = context.previous;
+  if (previous?.type === "keyword") {
+    if (BLOCK_KEYWORDS.has(previous.value)) return { block: true, expression: false };
+    if (OBJECT_KEYWORDS.has(previous.value)) return { block: false, expression: true };
+  }
+  if (previous?.type === "operator") {
+    if (previous.value === "=>") return { block: true, expression: true };
+    return { block: false, expression: true };
+  }
+  if (previous?.type === "bracket") {
+    if (previous.value === ")") {
+      return {
+        block: true,
+        expression:
+          context.lastClosedParenFunction && context.lastClosedParenFunctionExpression,
+      };
+    }
+    if (previous.value === "}") {
+      return { block: context.lastClosedBraceBlock, expression: true };
+    }
+    return { block: false, expression: true };
+  }
+  return { block: context.regexAllowed, expression: false };
+}
+
+function isFunctionExpressionContext(context: TokenContext): boolean {
+  if (!context.previous) return false;
+  if (context.previous.type === "operator") {
+    return ![";", "}"].includes(context.previous.value);
+  }
+  if (context.previous.type === "keyword") {
+    return ["return", "throw", "yield", "await", "new"].includes(context.previous.value);
+  }
+  return context.previous.type === "bracket";
+}
+
+function popBracket(
+  brackets: BracketFrame[],
+  kind: BracketKind,
+): BracketFrame | undefined {
+  for (let index = brackets.length - 1; index >= 0; index -= 1) {
+    if (brackets[index].kind === kind) {
+      return brackets.splice(index, 1)[0];
+    }
+  }
+  return undefined;
+}
+
+function isWhitespace(character: string | undefined): boolean {
+  return character === " " || character === "\t" || character === "\r";
 }
 
 function toStickyRegExp(pattern: RegExp): RegExp {
@@ -157,40 +415,4 @@ function toStickyRegExp(pattern: RegExp): RegExp {
   }
 
   return new RegExp(pattern.source, `${pattern.flags.replace("g", "")}y`);
-}
-
-function canStartRegex(previousToken: Token | undefined): boolean {
-  if (!previousToken) return true;
-
-  switch (previousToken.type) {
-    case "keyword": {
-      return [
-        "return", "case", "throw", "else", "do", "yield", "await",
-        "of", "in", "new", "typeof", "instanceof", "delete", "void",
-        "if", "while", "for", "switch", "with",
-      ].includes(previousToken.value);
-    }
-    case "bracket": {
-      return ["(", "[", "{"].includes(previousToken.value);
-    }
-    case "operator": {
-      return !["++", "--", "."].includes(previousToken.value);
-    }
-    case "variable":
-    case "number":
-    case "string":
-    case "regex":
-    case "boolean":
-    case "builtin":
-    case "function":
-    case "type":
-    case "generic":
-    case "type-annotation":
-    case "non-null":
-    case "optional-chaining":
-    case "jsx-tag":
-      return false;
-    default:
-      return false;
-  }
 }
