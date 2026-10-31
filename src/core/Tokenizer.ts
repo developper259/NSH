@@ -93,7 +93,7 @@ export class Tokenizer {
       for (const rule of compiledState.rules) {
         if (
           rule.original.context &&
-          !rule.original.context(line, position, tokens, stateStack)
+          !rule.original.context(line, position, tokens, stateStack, lineIndex)
         ) {
           continue;
         }

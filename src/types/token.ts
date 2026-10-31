@@ -23,6 +23,7 @@ export interface TokenType {
     position: number,
     tokens: Token[],
     stateStack: string[],
+    lineIndex: number,
   ) => boolean;
   push?: string | StatePushResolver;
   pop?: boolean;
