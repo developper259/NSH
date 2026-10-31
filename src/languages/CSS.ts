@@ -145,7 +145,7 @@ export class CSS implements LanguageDefinition {
   private numberRule: TokenType = {
     name: "number",
     pattern:
-      /\b\d+(?:\.\d+)?(?:px|em|rem|vh|vw|vmin|vmax|%|s|ms|deg|rad|turn|hz|khz|dpi|dpcm|dppx|fr|ch|ex)?(?![\w-])/g,
+      /-?\b\d+(?:\.\d+)?(?:px|em|rem|vh|vw|vmin|vmax|%|s|ms|deg|rad|turn|hz|khz|dpi|dpcm|dppx|fr|ch|ex)?(?![\w-])/g,
     className: "nsh-number",
   };
 
@@ -217,7 +217,7 @@ export class CSS implements LanguageDefinition {
 
   private operatorRule: TokenType = {
     name: "operator",
-    pattern: /[{}():;,>~+*|]/g,
+    pattern: /[{}():;,>~+*|]|-(?=\s|\d|\.)/g,
     className: "nsh-operator",
   };
 
@@ -254,6 +254,8 @@ export class CSS implements LanguageDefinition {
         this.atRule,
         this.variableRule,
         this.functionRule,
+        this.stringRule,
+        this.numberRule,
         this.pseudoClassRule,
         this.selectorTagRule,
         this.selectorClassRule,
@@ -281,7 +283,6 @@ export class CSS implements LanguageDefinition {
         this.propertyRule,
         this.numberRule,
         this.stringRule,
-        this.valueIdentifierRule,
         {
           name: "block-start",
           pattern: /{/g,
@@ -295,6 +296,7 @@ export class CSS implements LanguageDefinition {
           pop: true,
         },
         this.operatorRule,
+        this.valueIdentifierRule,
       ],
       inMultiLineComment: [
         {

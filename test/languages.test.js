@@ -1020,6 +1020,94 @@ test("JavaScript template expressions tolerate nested object braces", () => {
   }
 });
 
+test("HTML JSON script variants close case-insensitively", () => {
+  const cases = [
+    '<script type="application/json">{"a":1}</SCRIPT><b>x</b>',
+    "<script type='application/ld+json'>{a:1}</script><b>x</b>",
+    "<script type=application/json>{a:1}</script><b>x</b>",
+  ];
+  for (const source of cases) {
+    const result = new Tokenizer(new HTML()).tokenizeWithState(source);
+    assert.deepEqual(result.finalStateStack, ["root"], source);
+    assert.ok(result.tokens.some((token) => token.type === "json-text"), source);
+    assert.ok(
+      result.tokens.some(
+        (token) => token.type === "tag-open" && token.value === "<b",
+      ),
+      source,
+    );
+  }
+});
+
+test("HTML text content is tokenized without spans", () => {
+  const tokens = tokensFor(HTML, "<div>Hello &amp; bye</div>");
+  assert.ok(tokens.some((token) => token.type === "text" && token.value === "Hello "));
+  assert.ok(tokens.some((token) => token.type === "entity"));
+});
+
+test("XML declarations and doctypes span their full context", () => {
+  const declaration = tokensFor(XML, '<?xml version="1.0" encoding="UTF-8"?>');
+  assert.ok(
+    declaration.some(
+      (token) => token.type === "attribute" && token.value === "version",
+    ),
+  );
+  assert.ok(
+    declaration.some((token) => token.type === "xml-decl" && token.value === "?>"),
+  );
+
+  const doctype = new Tokenizer(new XML()).tokenizeWithState(
+    "<!DOCTYPE root [\n  <!ELEMENT root (#PCDATA)>\n]>\n<root/>",
+  );
+  assert.deepEqual(doctype.finalStateStack, ["root"]);
+  assert.ok(
+    doctype.tokens.some(
+      (token) => token.line === 4 && token.type === "tag-open" && token.value === "<root",
+    ),
+  );
+});
+
+test("CSS imports, negative dimensions and calc are coherent", () => {
+  const imported = tokensFor(CSS, '@import "x.css";');
+  assert.ok(imported.some((token) => token.type === "string" && token.value === '"x.css"'));
+  assert.equal(imported.filter((token) => token.type === "selector-class").length, 0);
+
+  const values = tokensFor(CSS, "a { margin: -5px; width: calc(100% - 10px); }");
+  assert.ok(
+    values.some((token) => token.type === "number" && token.value === "-5px"),
+  );
+  assert.ok(
+    values.some((token) => token.type === "operator" && token.value === "-"),
+  );
+});
+
+test("YAML block scalars respect indentation and chomp indicators", () => {
+  const top = new Tokenizer(new YAML()).tokenizeWithState(
+    "key: |\n  x\nnext: value",
+  );
+  assert.deepEqual(top.finalStateStack, ["root"]);
+  assert.ok(
+    top.tokens.some(
+      (token) => token.line === 3 && token.type === "yaml-key" && token.value === "next",
+    ),
+  );
+
+  const nested = new Tokenizer(new YAML()).tokenizeWithState(
+    "a:\n  b: |\n    x\n  c: 1\nd: 2",
+  );
+  assert.deepEqual(nested.finalStateStack, ["root"]);
+  assert.ok(
+    nested.tokens.some(
+      (token) => token.line === 4 && token.type === "yaml-key" && token.value === "c",
+    ),
+  );
+  assert.ok(
+    nested.tokens.some(
+      (token) => token.line === 5 && token.type === "yaml-key" && token.value === "d",
+    ),
+  );
+});
+
 test("HTML plain text, attributes, script, style", () => {
   const code =
     '<div data-x="1">text</div><style>body{color:red}</style><script>const a=1;</script>';

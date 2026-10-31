@@ -67,6 +67,7 @@ export class HTML implements LanguageDefinition {
       pattern: /<\?[\s\S]*?\?>/g,
       className: "nsh-comment",
     },
+    { name: "text", pattern: /[^<&]+/g },
   ];
 
   public getTokenTypes(): TokenType[] {
@@ -133,8 +134,9 @@ export class HTML implements LanguageDefinition {
       root: [
         {
           name: "doctype",
-          pattern: /<!DOCTYPE[^>]*>/gi,
+          pattern: /<!DOCTYPE\b/gi,
           className: "nsh-keyword",
+          push: "inDoctype",
         },
         {
           name: "comment",
@@ -183,6 +185,7 @@ export class HTML implements LanguageDefinition {
           className: "nsh-comment",
           push: "inProcessing",
         },
+        { name: "text", pattern: /[^<&]+/g },
       ],
 
       inTag: [
@@ -210,7 +213,8 @@ export class HTML implements LanguageDefinition {
         },
         {
           name: "script-type-json",
-          pattern: /type\s*=\s*"application\/json"/gi,
+          pattern:
+            /type\s*=\s*(?:"application\/(?:[a-z0-9.+-]*\+)?json"|'application\/(?:[a-z0-9.+-]*\+)?json'|application\/(?:[a-z0-9.+-]*\+)?json)/gi,
           className: "nsh-string",
           push: "inScriptJsonTag",
         },
@@ -248,7 +252,7 @@ export class HTML implements LanguageDefinition {
         },
         {
           name: "json-text",
-          pattern: /(?:(?!<\/script\s*>).)+/g,
+          pattern: /(?:(?!<\/script\s*>).)+/gi,
           className: "nsh-string",
         },
       ],
@@ -330,6 +334,35 @@ export class HTML implements LanguageDefinition {
           name: "processing-instruction",
           pattern: /(?:(?!\?>).)+/g,
           className: "nsh-comment",
+        },
+      ],
+      inDoctype: [
+        {
+          name: "doctype",
+          pattern: />/g,
+          className: "nsh-keyword",
+          pop: true,
+        },
+        {
+          name: "comment",
+          pattern: /<!--/g,
+          className: "nsh-comment",
+          push: "inComment",
+        },
+        {
+          name: "doctype",
+          pattern: /[\[\]]/g,
+          className: "nsh-keyword",
+        },
+        {
+          name: "string",
+          pattern: /"[^"]*"|'[^']*'/g,
+          className: "nsh-string",
+        },
+        {
+          name: "doctype",
+          pattern: /[^>"'\[]+/g,
+          className: "nsh-keyword",
         },
       ],
 

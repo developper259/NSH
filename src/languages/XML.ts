@@ -101,12 +101,13 @@ export class XML implements LanguageDefinition {
           name: "xml-decl",
           pattern: /<\?xml\b/gi,
           className: "nsh-keyword",
-          push: "inProcessing",
+          push: "inXmlDecl",
         },
         {
           name: "doctype",
-          pattern: /<!DOCTYPE[^>]*>/gi,
+          pattern: /<!DOCTYPE\b/gi,
           className: "nsh-keyword",
+          push: "inDoctype",
         },
         {
           name: "comment",
@@ -209,6 +210,54 @@ export class XML implements LanguageDefinition {
           pop: true,
         },
         { name: "cdata", pattern: /(?:(?!\]\]>).)+/g, className: "nsh-string" },
+      ],
+      inXmlDecl: [
+        {
+          name: "xml-decl",
+          pattern: /\?>/g,
+          className: "nsh-keyword",
+          pop: true,
+        },
+        {
+          name: "attribute",
+          pattern: new RegExp(this.nameSource, "g"),
+          className: "nsh-variable",
+        },
+        { name: "operator", pattern: /=/g, className: "nsh-operator" },
+        {
+          name: "string",
+          pattern: /"[^"]*"|'[^']*'/g,
+          className: "nsh-string",
+        },
+      ],
+      inDoctype: [
+        {
+          name: "doctype",
+          pattern: />/g,
+          className: "nsh-keyword",
+          pop: true,
+        },
+        {
+          name: "comment",
+          pattern: /<!--/g,
+          className: "nsh-comment",
+          push: "inComment",
+        },
+        {
+          name: "doctype",
+          pattern: /[\[\]]/g,
+          className: "nsh-keyword",
+        },
+        {
+          name: "string",
+          pattern: /"[^"]*"|'[^']*'/g,
+          className: "nsh-string",
+        },
+        {
+          name: "doctype",
+          pattern: /[^>"'\[]+/g,
+          className: "nsh-keyword",
+        },
       ],
       inProcessing: [
         {

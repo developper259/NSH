@@ -1,5 +1,5 @@
 import { LanguageDefinition } from "../types/language";
-import { TokenType } from "../types/token";
+import { StatePushResolver, Token, TokenType } from "../types/token";
 import {
   createKeywordToken,
   createStringToken,
@@ -67,18 +67,18 @@ export class YAML implements LanguageDefinition {
       root: [
         {
           name: "block-scalar-start",
-          pattern: /^(\s*)(?:[a-zA-ZÀ-ÿ0-9_-]+\s*:\s*)([|>])/gm,
+          pattern: /^(\s*)(?:[a-zA-ZÀ-ÿ0-9_-]+\s*:\s*)([|>][+-]?)/gm,
           className: "nsh-operator",
-          push: "inBlockScalar",
+          push: blockScalarPush,
         },
         ...this.tokenTypes,
       ],
       inBlockScalar: [
         {
           name: "block-scalar-end",
-          pattern: /^(\S+.*)$/m,
-          className: "nsh-string",
+          pattern: /^/g,
           pop: true,
+          context: isBlockScalarEnd,
         },
         {
           name: "block-scalar",
@@ -91,4 +91,31 @@ export class YAML implements LanguageDefinition {
 
   comments = { singleLine: "#" };
   strings = { startEnd: ['"', "'"], escapeChar: "\\" };
+}
+
+const blockScalarPush: StatePushResolver = (
+  line,
+  _position,
+  _tokens,
+  _stateStack,
+  _matched,
+) => {
+  const indentation = /^[ \t]*/.exec(line)?.[0].length ?? 0;
+  return `inBlockScalar:${indentation}`;
+};
+
+function isBlockScalarEnd(
+  line: string,
+  position: number,
+  _tokens: Token[],
+  stateStack: string[],
+): boolean {
+  if (position !== 0 || line.trim() === "") return false;
+  const currentState = stateStack[stateStack.length - 1];
+  const separator = currentState.lastIndexOf(":");
+  if (separator < 0) return false;
+  const requiredIndentation = Number(currentState.slice(separator + 1));
+  if (!Number.isFinite(requiredIndentation)) return false;
+  const indentation = /^[ \t]*/.exec(line)?.[0].length ?? 0;
+  return indentation <= requiredIndentation;
 }
