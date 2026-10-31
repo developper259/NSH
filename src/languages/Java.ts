@@ -276,6 +276,11 @@ export class Java implements LanguageDefinition {
         ]),
         {
           name: "jsdoc",
+          pattern: /\/\*\*\//g,
+          className: "nsh-comment",
+        },
+        {
+          name: "jsdoc",
           pattern: /\/\*\*/g,
           className: "nsh-comment",
           push: "inJavadoc",

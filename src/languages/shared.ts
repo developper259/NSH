@@ -13,6 +13,9 @@ export const COMMENT_PATTERNS = {
   }
 };
 
+export const REGEX_PATTERN =
+  /\/(?:[^/\\\n\[]|\\.|\[(?:[^\]\\\n]|\\.)*\])+\/[dgimsuvy]*/g;
+
 export const STRING_PATTERNS = {
   singleQuote: /'(?:[^'\\]|\\.)*'/g,
   doubleQuote: /"(?:[^"\\]|\\.)*"/g,

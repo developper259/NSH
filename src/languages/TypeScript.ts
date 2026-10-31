@@ -10,6 +10,7 @@ import {
   STRING_PATTERNS,
   NUMBER_PATTERNS,
   COMMENT_PATTERNS,
+  REGEX_PATTERN,
 } from "./shared";
 
 export class TypeScript implements LanguageDefinition {
@@ -206,7 +207,7 @@ export class TypeScript implements LanguageDefinition {
     { name: "jsdoc", pattern: /\/\*\*[\s\S]*?\*\//g, className: "nsh-comment" },
     {
       name: "regex",
-      pattern: /\/[^/\n\\]*(?:\\.[^/\n\\]*)*\/[dgimsuvy]*/g,
+      pattern: REGEX_PATTERN,
       className: "nsh-string",
     },
     {
@@ -288,6 +289,11 @@ export class TypeScript implements LanguageDefinition {
         ]),
         {
           name: "jsdoc",
+          pattern: /\/\*\*\//g,
+          className: "nsh-comment",
+        },
+        {
+          name: "jsdoc",
           pattern: /\/\*\*/g,
           className: "nsh-comment",
           push: "inJSDoc",
@@ -301,7 +307,7 @@ export class TypeScript implements LanguageDefinition {
         createCommentToken(COMMENT_PATTERNS.singleLine.doubleSlash),
         {
           name: "regex",
-          pattern: /\/[^/\n\\]*(?:\\.[^/\n\\]*)*\/[dgimsuvy]*/g,
+          pattern: REGEX_PATTERN,
           className: "nsh-string",
         },
         {
@@ -380,6 +386,12 @@ export class TypeScript implements LanguageDefinition {
       ],
       inType: [
         {
+          name: "bracket",
+          pattern: /^/g,
+          pop: true,
+          context: shouldEndTypeAtLineStart,
+        },
+        {
           name: "type",
           pattern: /[A-Za-z_$][A-Za-z0-9_$]*/g,
           className: "nsh-type",
@@ -410,7 +422,12 @@ export class TypeScript implements LanguageDefinition {
         },
         {
           name: "bracket",
-          pattern: /[{}]/g,
+          pattern: /(?=\})/g,
+          pop: true,
+        },
+        {
+          name: "bracket",
+          pattern: /\{/g,
           className: "nsh-bracket",
           push: "inTypeObject",
         },
@@ -432,6 +449,13 @@ export class TypeScript implements LanguageDefinition {
           name: "type-separator",
           pattern: /[>\[\]|&,?():]/g,
           className: "nsh-operator",
+        },
+        {
+          name: "bracket",
+          pattern: /\{/g,
+          className: "nsh-bracket",
+          context: isReturnTypeObjectStart,
+          push: "inTypeObject",
         },
         {
           name: "bracket",
@@ -553,8 +577,9 @@ export class TypeScript implements LanguageDefinition {
       inTemplate: [
         {
           name: "template-expression",
-          pattern: /\$\{[^}]*\}/g,
+          pattern: /\$\{/g,
           className: "nsh-variable",
+          push: "inTemplateExpression",
         },
         { name: "string", pattern: /`/g, className: "nsh-string", pop: true },
         {
@@ -562,6 +587,34 @@ export class TypeScript implements LanguageDefinition {
           pattern: /([^`$]|\$(?!\{))+/g,
           className: "nsh-string",
         },
+      ],
+      inTemplateExpression: [
+        { name: "string", pattern: /`/g, className: "nsh-string", push: "inTemplate" },
+        { name: "bracket", pattern: /\{/g, className: "nsh-bracket", push: "inTemplateBrace" },
+        { name: "template-expression", pattern: /\}/g, className: "nsh-variable", pop: true },
+        createStringToken([STRING_PATTERNS.singleQuote, STRING_PATTERNS.doubleQuote]),
+        createNumberToken([
+          NUMBER_PATTERNS.scientific,
+          NUMBER_PATTERNS.decimal,
+          NUMBER_PATTERNS.integer,
+        ]),
+        { name: "bracket", pattern: /[\[\]\(\)]/g, className: "nsh-bracket" },
+        { name: "operator", pattern: /[+\-*/%=<>!&|^~?:;,.]/g, className: "nsh-operator" },
+        createVariableToken(),
+      ],
+      inTemplateBrace: [
+        { name: "string", pattern: /`/g, className: "nsh-string", push: "inTemplate" },
+        { name: "bracket", pattern: /\{/g, className: "nsh-bracket", push: "inTemplateBrace" },
+        { name: "bracket", pattern: /\}/g, className: "nsh-bracket", pop: true },
+        createStringToken([STRING_PATTERNS.singleQuote, STRING_PATTERNS.doubleQuote]),
+        createNumberToken([
+          NUMBER_PATTERNS.scientific,
+          NUMBER_PATTERNS.decimal,
+          NUMBER_PATTERNS.integer,
+        ]),
+        { name: "bracket", pattern: /[\[\]\(\)]/g, className: "nsh-bracket" },
+        { name: "operator", pattern: /[+\-*/%=<>!&|^~?:;,.]/g, className: "nsh-operator" },
+        createVariableToken(),
       ],
     };
   }
@@ -624,6 +677,48 @@ function isRootTypeReference(
     /^\s*</.test(suffix) ||
     /^[A-Za-z_$][A-Za-z0-9_$]*\s*</.test(suffix)
   );
+}
+
+function shouldEndTypeAtLineStart(
+  line: string,
+  position: number,
+  _tokens: Token[],
+  stateStack: string[],
+): boolean {
+  if (position !== 0 || stateStack[stateStack.length - 1] !== "inType") {
+    return false;
+  }
+
+  const rest = line.trimStart();
+  if (/^[}\])]/.test(rest)) return true;
+  if (
+    /^(?:readonly\s+)?[A-Za-z_$][A-Za-z0-9_$]*\s*(?:[?:]|\()/.test(rest) ||
+    /^\[[^\]]+\]\s*[?:]/.test(rest)
+  ) {
+    return true;
+  }
+  return /^(?:const|let|var|function|class|interface|type|export|import|return|if|for|while|switch|try|throw|new)\b/.test(
+    rest,
+  );
+}
+
+function isReturnTypeObjectStart(
+  line: string,
+  position: number,
+  tokens: Token[],
+  stateStack: string[],
+): boolean {
+  if (stateStack[stateStack.length - 1] !== "inReturnType") return false;
+
+  let lastToken: Token | undefined;
+  for (let index = tokens.length - 1; index >= 0; index -= 1) {
+    if (tokens[index].type !== "comment") {
+      lastToken = tokens[index];
+      break;
+    }
+  }
+  if (!lastToken) return true;
+  return [":", "|", "&", "<", ","].includes(lastToken.value);
 }
 
 function isAfterDot(

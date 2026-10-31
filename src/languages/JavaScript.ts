@@ -10,6 +10,7 @@ import {
   STRING_PATTERNS,
   NUMBER_PATTERNS,
   COMMENT_PATTERNS,
+  REGEX_PATTERN,
 } from "./shared";
 
 export class JavaScript implements LanguageDefinition {
@@ -208,7 +209,7 @@ export class JavaScript implements LanguageDefinition {
     createCommentToken(COMMENT_PATTERNS.singleLine.doubleSlash),
     {
       name: "regex",
-      pattern: /\/[^/\n\\]*(?:\\.[^/\n\\]*)*\/[dgimsuvy]*/g,
+      pattern: REGEX_PATTERN,
       className: "nsh-string",
     },
     createFunctionToken(),
@@ -269,7 +270,7 @@ export class JavaScript implements LanguageDefinition {
         createCommentToken(COMMENT_PATTERNS.singleLine.doubleSlash),
         {
           name: "regex",
-          pattern: /\/[^/\n\\]*(?:\\.[^/\n\\]*)*\/[dgimsuvy]*/g,
+          pattern: REGEX_PATTERN,
           className: "nsh-string",
         },
         createFunctionToken(),
@@ -320,6 +321,7 @@ export class JavaScript implements LanguageDefinition {
         },
       ],
       inTemplateExpression: [
+        { name: "string", pattern: /`/g, className: "nsh-string", push: "inTemplate" },
         { name: "bracket", pattern: /\{/g, className: "nsh-bracket", push: "inTemplateBrace" },
         { name: "template-expression", pattern: /\}/g, className: "nsh-variable", pop: true },
         createStringToken([STRING_PATTERNS.singleQuote, STRING_PATTERNS.doubleQuote]),
@@ -329,6 +331,7 @@ export class JavaScript implements LanguageDefinition {
         createVariableToken(),
       ],
       inTemplateBrace: [
+        { name: "string", pattern: /`/g, className: "nsh-string", push: "inTemplate" },
         { name: "bracket", pattern: /\{/g, className: "nsh-bracket", push: "inTemplateBrace" },
         { name: "bracket", pattern: /\}/g, className: "nsh-bracket", pop: true },
         createStringToken([STRING_PATTERNS.singleQuote, STRING_PATTERNS.doubleQuote]),

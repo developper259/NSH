@@ -52,6 +52,73 @@ test("smoke: every registered language produces tokens on a simple example", () 
   }
 });
 
+test("TypeScript type states converge after objects, interfaces and return types", () => {
+  const cases = [
+    "type X = { a: string };\nconst y = 1;",
+    "interface I {\n  foo: string\n  bar: number\n}\nconst y = 1;",
+    "type X = { a: { b: string } };\nconst y = 1;",
+    'function f(): { a: string } { return { a: "x" }; }\nconst y = 1;',
+  ];
+  for (const source of cases) {
+    const result = new Tokenizer(new TypeScript()).tokenizeWithState(source);
+    assert.deepEqual(result.finalStateStack, ["root"], source);
+    assert.ok(
+      result.tokens.some(
+        (token) =>
+          token.line > 1 && token.type === "keyword" && token.value === "const",
+      ),
+      `expected const keyword after: ${source}`,
+    );
+  }
+});
+
+test("TypeScript templates are stateful and nested", () => {
+  for (const source of [
+    "const s = `a${ {x: 1} }c`;\nconst y = 2;",
+    "const s = `${`inner ${x}`}`;\nconst y = 2;",
+  ]) {
+    const result = new Tokenizer(new TypeScript()).tokenizeWithState(source);
+    assert.deepEqual(result.finalStateStack, ["root"], source);
+    assert.ok(
+      result.tokens.some(
+        (token) => token.type === "template-expression" && token.value === "${",
+      ),
+      source,
+    );
+    assert.ok(
+      result.tokens.some(
+        (token) => token.line === 2 && token.type === "keyword" && token.value === "const",
+      ),
+      source,
+    );
+  }
+});
+
+test("empty JSDoc comments do not leak comment state", () => {
+  for (const [definition, code, expected] of [
+    [new TypeScript(), "/**/\nconst y = 1;", "const"],
+    [new Java(), "/**/\nclass A {}", "class"],
+  ]) {
+    const result = new Tokenizer(definition).tokenizeWithState(code);
+    assert.deepEqual(result.finalStateStack, ["root"], code);
+    assert.ok(
+      result.tokens.some(
+        (token) => token.line === 2 && token.type === "keyword" && token.value === expected,
+      ),
+      code,
+    );
+  }
+});
+
+test("JavaScript and TypeScript regex literals support character classes", () => {
+  for (const definition of [JavaScript, TypeScript]) {
+    const tokens = tokensFor(definition, "const re = /[/]/;");
+    const regexes = tokens.filter((token) => token.type === "regex");
+    assert.equal(regexes.length, 1, definition.name);
+    assert.equal(regexes[0].value, "/[/]/", definition.name);
+  }
+});
+
 test("TypeScript decimal numbers are a single token", () => {
   const cases = [
     "123",
