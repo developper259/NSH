@@ -10,4 +10,6 @@ export interface EmbeddedLanguageOptions {
   prefix: string;
   /** Return to the exact parent state instead of leaving the host language. */
   exitMode?: "host" | "parent";
+  /** Child states where the host exit rule must not be injected. */
+  skipExitStates?: string[];
 }

@@ -1,16 +1,8 @@
 import { LanguageDefinition } from "../types/language";
-import { TokenType } from "../types/token";
+import { StatePushResolver, Token, TokenType } from "../types/token";
 import { HTML } from "./HTML";
 import { createEmbeddedStates } from "../utils/EmbedLanguage";
-import {
-  createKeywordToken,
-  createStringToken,
-  createNumberToken,
-  createCommentToken,
-  STRING_PATTERNS,
-  NUMBER_PATTERNS,
-  COMMENT_PATTERNS,
-} from "./shared";
+import { createKeywordToken, createNumberToken, NUMBER_PATTERNS } from "./shared";
 
 class PHPCode implements LanguageDefinition {
   name = "php-code";
@@ -189,10 +181,25 @@ class PHPCode implements LanguageDefinition {
       pattern: new RegExp(`\\b(${this.phpBuiltins.join("|")})\\b`, "g"),
       className: "nsh-function",
     },
-    createStringToken([
-      STRING_PATTERNS.singleQuote,
-      STRING_PATTERNS.doubleQuote,
-    ]),
+    {
+      name: "string",
+      pattern:
+        /<<<\s*(?:"[A-Za-z_][A-Za-z0-9_]*"|'[A-Za-z_][A-Za-z0-9_]*'|[A-Za-z_][A-Za-z0-9_]*)/g,
+      className: "nsh-string",
+      push: heredocPush,
+    },
+    {
+      name: "string",
+      pattern: /"/g,
+      className: "nsh-string",
+      push: "inDoubleString",
+    },
+    {
+      name: "string",
+      pattern: /'/g,
+      className: "nsh-string",
+      push: "inSingleString",
+    },
     createNumberToken([
       NUMBER_PATTERNS.hex,
       NUMBER_PATTERNS.binary,
@@ -201,14 +208,16 @@ class PHPCode implements LanguageDefinition {
       NUMBER_PATTERNS.decimal,
       NUMBER_PATTERNS.integer,
     ]),
-    createCommentToken(COMMENT_PATTERNS.multiLine.slashStar),
-    createCommentToken(COMMENT_PATTERNS.singleLine.doubleSlash),
     {
       name: "php-attribute",
       pattern: /#\[[^\]]*\]/g,
       className: "nsh-function",
     },
-    { name: "comment", pattern: /#(?!\[)[^\n]*/g, className: "nsh-comment" },
+    {
+      name: "comment",
+      pattern: /(?:\/\/|#(?!\[))(?:(?!\?>).)*/g,
+      className: "nsh-comment",
+    },
     {
       name: "variable",
       pattern: /\$[a-zA-Z_][a-zA-Z0-9_]*/g,
@@ -255,11 +264,78 @@ class PHPCode implements LanguageDefinition {
         { name: "comment", pattern: /\*\//g, className: "nsh-comment", pop: true },
         { name: "comment", pattern: /(?:(?!\*\/).)+/g, className: "nsh-comment" },
       ],
+      inDoubleString: [
+        { name: "string", pattern: /"/g, className: "nsh-string", pop: true },
+        { name: "string", pattern: /\\[\s\S]/g, className: "nsh-string" },
+        {
+          name: "variable",
+          pattern: /\$[a-zA-Z_][a-zA-Z0-9_]*/g,
+          className: "nsh-variable",
+        },
+        { name: "string", pattern: /[^"\\$]+/g, className: "nsh-string" },
+      ],
+      inSingleString: [
+        { name: "string", pattern: /'/g, className: "nsh-string", pop: true },
+        { name: "string", pattern: /\\[\s\S]/g, className: "nsh-string" },
+        { name: "string", pattern: /[^'\\]+/g, className: "nsh-string" },
+      ],
+      inHeredoc: [
+        {
+          name: "string",
+          pattern: /^[A-Za-z_][A-Za-z0-9_]*(?=;?\s*$)/g,
+          className: "nsh-string",
+          pop: true,
+          context: isHeredocTerminator,
+        },
+        {
+          name: "variable",
+          pattern: /\$[a-zA-Z_][a-zA-Z0-9_]*/g,
+          className: "nsh-variable",
+        },
+        { name: "string", pattern: /[^$\n]+/g, className: "nsh-string" },
+      ],
+      inNowdoc: [
+        {
+          name: "string",
+          pattern: /^[A-Za-z_][A-Za-z0-9_]*(?=;?\s*$)/g,
+          className: "nsh-string",
+          pop: true,
+          context: isHeredocTerminator,
+        },
+        { name: "string", pattern: /[^\n]+/g, className: "nsh-string" },
+      ],
     };
   }
 
   comments = { singleLine: "//", multiLine: { start: "/*", end: "*/" } };
   strings = { startEnd: ['"', "'"], escapeChar: "\\" };
+}
+
+const heredocPush: StatePushResolver = (
+  _line,
+  _position,
+  _tokens,
+  _stateStack,
+  matched,
+) => {
+  const singleQuoted = matched.includes("'");
+  const delimiter = matched
+    .replace(/^<<<\s*/, "")
+    .replace(/^["']|["']$/g, "");
+  return `${singleQuoted ? "inNowdoc" : "inHeredoc"}:${delimiter}`;
+};
+
+function isHeredocTerminator(
+  line: string,
+  _position: number,
+  _tokens: Token[],
+  stateStack: string[],
+): boolean {
+  const currentState = stateStack[stateStack.length - 1];
+  const separator = currentState.lastIndexOf(":");
+  if (separator < 0) return false;
+  const delimiter = currentState.slice(separator + 1);
+  return line.trim().replace(/;$/, "") === delimiter;
 }
 
 export class PHP implements LanguageDefinition {
@@ -272,7 +348,7 @@ export class PHP implements LanguageDefinition {
   public tokenTypes: TokenType[] = [
     {
       name: "php-open",
-      pattern: /<\?php\b|<\?=/gi,
+      pattern: /<\?(?:php\b|=|(?!xml\b))/gi,
       className: "nsh-keyword",
     },
     { name: "php-close", pattern: /\?>/g, className: "nsh-keyword" },
@@ -294,35 +370,26 @@ export class PHP implements LanguageDefinition {
       },
       prefix: "php_",
       exitMode: "parent",
+      skipExitStates: [
+        "inMultiLineComment",
+        "inDoubleString",
+        "inSingleString",
+        "inHeredoc",
+        "inNowdoc",
+      ],
     });
 
     const phpOpenRule: TokenType = {
       name: "php-open",
-      pattern: /<\?php\b|<\?=/gi,
+      pattern: /<\?(?:php\b|=|(?!xml\b))/gi,
       className: "nsh-keyword",
       push: "php_root",
     };
 
     const htmlStates = this.html.getStates();
-
-    const statesWithPhpEntry = new Set([
-      "root",
-      "js_root",
-      "css_root",
-      "inTag",
-      "inScriptTag",
-      "inStyleTag",
-      "inDoubleQuote",
-      "inSingleQuote",
-      "inComment",
-    ]);
-
     const mergedHtmlStates: Record<string, TokenType[]> = {};
     for (const [stateName, rules] of Object.entries(htmlStates)) {
-      const acceptsPhp = statesWithPhpEntry.has(stateName) || stateName === "css_inDeclaration";
-      mergedHtmlStates[stateName] = acceptsPhp
-        ? [phpOpenRule, ...rules]
-        : rules;
+      mergedHtmlStates[stateName] = [phpOpenRule, ...rules];
     }
 
     return {

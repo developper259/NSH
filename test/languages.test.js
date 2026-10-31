@@ -690,6 +690,69 @@ test("theme and custom token classes cannot inject HTML attributes", () => {
   assert.match(html, /nsh-theme-dark/);
   assert.doesNotMatch(html, /onclick/);
 });
+test("PHP closing tags stay inside strings and block comments", () => {
+  const cases = [
+    '<?php /* start\n?> still comment */\necho 1; ?>',
+    '<?php $x = "line1\n?>\nline2";\necho $x; ?>',
+  ];
+  for (const source of cases) {
+    const result = new Tokenizer(new PHP()).tokenizeWithState(source);
+    assert.deepEqual(result.finalStateStack, ["root"], source);
+    assert.ok(
+      result.tokens.some((token) => token.type === "keyword" && token.value === "echo"),
+      source,
+    );
+  }
+});
+
+test("PHP closing tags end line comments and open HTML", () => {
+  for (const source of [
+    "<?php // x ?> <div>html</div>",
+    "<?php # x ?> <div>html</div>",
+  ]) {
+    const tokens = tokensFor(PHP, source);
+    assert.ok(tokens.some((token) => token.type === "php-close"), source);
+    assert.ok(
+      tokens.some((token) => token.type === "tag-open" && token.value === "<div"),
+      source,
+    );
+  }
+});
+
+test("PHP heredoc and nowdoc keep their state", () => {
+  const heredoc = "<?php $x = <<<EOT\nhello $name\nEOT;\necho $x; ?>";
+  const nowdoc = "<?php $x = <<<'EOT'\nhello $name\nEOT;\necho $x; ?>";
+  for (const source of [heredoc, nowdoc]) {
+    const result = new Tokenizer(new PHP()).tokenizeWithState(source);
+    assert.deepEqual(result.finalStateStack, ["root"], source);
+    assert.ok(
+      result.tokens.some((token) => token.line === 4 && token.type === "keyword"),
+      source,
+    );
+  }
+  assert.ok(
+    tokensFor(PHP, heredoc).some((token) => token.type === "variable" && token.value === "$name"),
+    "heredoc interpolation missing",
+  );
+  assert.ok(
+    !tokensFor(PHP, nowdoc).some(
+      (token) => token.type === "variable" && token.value === "$name",
+    ),
+    "nowdoc content must stay literal",
+  );
+});
+
+test("PHP short open tags and embedded parents are recognized", () => {
+  const short = tokensFor(PHP, "<? echo 1; ?>");
+  assert.ok(short.some((token) => token.type === "php-open"), "short tag missing");
+  const script = new Tokenizer(new PHP()).tokenizeWithState(
+    "<script>\nconst value = <?= $value ?>;\n</script>",
+  );
+  assert.deepEqual(script.finalStateStack, ["root"]);
+  assert.ok(script.tokens.some((token) => token.type === "php-close"));
+  assert.ok(script.tokens.some((token) => token.type === "script-end"));
+});
+
 test("PHP decimal and scientific numbers are single tokens", () => {
   for (const code of [
     "<?php $value = 123.45; ?>",
