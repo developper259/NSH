@@ -474,16 +474,35 @@ By default:
 - host: `127.0.0.1`
 - port: dynamically assigned
 - maximum WebSocket payload: `2 MiB`
+- browser origins: loopback only (`localhost`, `127.0.0.1`, `::1`)
+- missing `Origin`: allowed for native clients
+- per-client limits: 64 connections, 32 documents, 1 MiB per document, 4 MiB of documents
+- request rate: 120 requests/second with a burst of 240
+- line ranges: 5,000 lines per request
+- lexical state depth: 64
+- heartbeat: every 30 seconds
 
-You can configure it:
+You can configure and harden it:
 
 ```ts
 const server = new NSHServer({
   host: "127.0.0.1",
   port: 8080,
   maxPayload: 4 * 1024 * 1024,
+  allowedOrigins: ["https://app.example"],
+  authenticate: (request) => request.headers["x-token"] === "secret",
+  maxClients: 16,
+  maxDocumentsPerClient: 8,
+  maxDocumentCharacters: 512 * 1024,
+  maxRequestsPerSecond: 60,
+  maxLinesPerRequest: 2000,
 });
 ```
+
+`authenticate` is required when the server binds to a non-loopback host. Use
+`allowNullOrigin: true` only when a trusted `file://` client needs it. The
+server also exposes `getConnectionCount()`, `getDocumentCount()` and
+`getLastError()` for diagnostics.
 
 ---
 

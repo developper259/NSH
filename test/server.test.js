@@ -337,9 +337,288 @@ test("documents are removed when the connection closes", async () => {
       language: "javascript",
       code: "a",
     });
+    assert.equal(server.getDocumentCount(), 1);
     client.close();
     await once(client, "close");
-    assert.equal(server.documentsSize(), 0);
+    assert.equal(server.getDocumentCount(), 0);
+  } finally {
+    await server.stop();
+  }
+});
+
+function connectionOutcome(url, options) {
+  return new Promise((resolve) => {
+    const client = new WebSocket(url, options);
+    client.once("open", () => {
+      client.close();
+      resolve("open");
+    });
+    client.once("unexpected-response", () => resolve("rejected"));
+    client.once("error", () => resolve("error"));
+  });
+}
+
+test("origin policy rejects web origins unless configured", async () => {
+  const server = new NSHServer();
+  try {
+    const port = await server.start();
+    const url = `ws://127.0.0.1:${port}`;
+    assert.notEqual(await connectionOutcome(url, { origin: "http://evil.example" }), "open");
+    assert.equal(await connectionOutcome(url, { origin: "http://localhost:3000" }), "open");
+    assert.equal(await connectionOutcome(url), "open");
+  } finally {
+    await server.stop();
+  }
+});
+
+test("custom origins and null origins are explicit opt-ins", async () => {
+  const custom = new NSHServer({ allowedOrigins: ["https://app.example"] });
+  const nullOrigin = new NSHServer({ allowNullOrigin: true });
+  try {
+    const customPort = await custom.start();
+    const customUrl = `ws://127.0.0.1:${customPort}`;
+    assert.equal(await connectionOutcome(customUrl, { origin: "https://app.example" }), "open");
+    assert.notEqual(await connectionOutcome(customUrl, { origin: "http://localhost:3000" }), "open");
+
+    const nullPort = await nullOrigin.start();
+    assert.equal(
+      await connectionOutcome(`ws://127.0.0.1:${nullPort}`, { origin: "null" }),
+      "open",
+    );
+  } finally {
+    await Promise.all([custom.stop(), nullOrigin.stop()]);
+  }
+});
+
+test("authentication callback and connection limits are enforced", async () => {
+  const server = new NSHServer({
+    maxClients: 1,
+    authenticate: (request) => request.headers["x-token"] === "secret",
+  });
+  try {
+    const port = await server.start();
+    const url = `ws://127.0.0.1:${port}`;
+    assert.notEqual(await connectionOutcome(url, { headers: { "x-token": "wrong" } }), "open");
+    const client = new WebSocket(url, { headers: { "x-token": "secret" } });
+    await once(client, "open");
+    assert.notEqual(
+      await connectionOutcome(url, { headers: { "x-token": "secret" } }),
+      "open",
+    );
+    client.close();
+    await once(client, "close");
+  } finally {
+    await server.stop();
+  }
+});
+
+test("requires authentication when binding beyond loopback", () => {
+  assert.throws(
+    () => new NSHServer({ host: "0.0.0.0" }),
+    /authenticate is required/,
+  );
+});
+
+test("limits documents, request rates and line ranges", async () => {
+  const server = new NSHServer({
+    maxDocumentsPerClient: 1,
+    maxLinesPerRequest: 2,
+  });
+  try {
+    const port = await server.start();
+    const client = await connect(server);
+    assert.equal(
+      (await request(client, {
+        id: "open-1",
+        requestType: "openDocument",
+        documentId: "one",
+        language: "javascript",
+        code: "a",
+      })).success,
+      true,
+    );
+    assert.equal(
+      (await request(client, {
+        id: "open-2",
+        requestType: "openDocument",
+        documentId: "two",
+        language: "javascript",
+        code: "b",
+      })).success,
+      false,
+    );
+    const largeRange = await request(client, {
+      id: "range",
+      requestType: "getDocumentLines",
+      documentId: "one",
+      startLine: 0,
+      endLine: 3,
+    });
+    assert.equal(largeRange.success, false);
+    client.close();
+    await once(client, "close");
+  } finally {
+    await server.stop();
+  }
+});
+
+test("rate limiting rejects bursts beyond the configured bucket", async () => {
+  const server = new NSHServer({
+    maxRequestsPerSecond: 1,
+    maxRequestBurst: 1,
+  });
+  try {
+    await server.start();
+    const client = await connect(server);
+    assert.equal(
+      (await request(client, { id: "first", requestType: "supportedLanguages" })).success,
+      true,
+    );
+    const limited = await request(client, {
+      id: "second",
+      requestType: "supportedLanguages",
+    });
+    assert.equal(limited.success, false);
+    assert.match(limited.error, /Rate limit/);
+    client.close();
+    await once(client, "close");
+  } finally {
+    await server.stop();
+  }
+});
+
+test("start and stop racing settles the start promise", async () => {
+  const server = new NSHServer();
+  const start = server.start();
+  const stop = server.stop();
+  await assert.rejects(start, /stopped before it started/);
+  await stop;
+  assert.equal(server.getPort(), null);
+});
+
+test("numeric ids are echoed in validation errors", async () => {
+  const server = new NSHServer();
+  try {
+    await server.start();
+    const client = await connect(server);
+    const response = await request(client, { id: 42, requestType: "supportedLanguages" });
+    assert.equal(response.success, false);
+    assert.equal(response.id, "42");
+    client.close();
+    await once(client, "close");
+  } finally {
+    await server.stop();
+  }
+});
+
+test("document budgets and truncated update responses are enforced", async () => {
+  const server = new NSHServer({
+    maxDocumentCharacters: 8,
+    maxLinesPerRequest: 2,
+  });
+  try {
+    await server.start();
+    const client = await connect(server);
+    assert.equal(
+      (await request(client, {
+        id: "too-large",
+        requestType: "openDocument",
+        documentId: "large",
+        language: "javascript",
+        code: "123456789",
+      })).success,
+      false,
+    );
+    assert.equal(
+      (await request(client, {
+        id: "ok",
+        requestType: "openDocument",
+        documentId: "doc",
+        language: "javascript",
+        code: "a\nb\nc\nd",
+      })).success,
+      true,
+    );
+    const updated = await request(client, {
+      id: "state-change",
+      requestType: "updateDocument",
+      documentId: "doc",
+      startLine: 0,
+      deletedLines: 1,
+      insertedLines: ["/*"],
+    });
+    assert.equal(updated.success, true);
+    assert.equal(updated.linesTruncated, true);
+    assert.equal(updated.lines.length, 2);
+    client.close();
+    await once(client, "close");
+  } finally {
+    await server.stop();
+  }
+});
+
+test("oversized frames are closed by the payload limit", async () => {
+  const server = new NSHServer({ maxPayload: 1024 });
+  try {
+    const port = await server.start();
+    const client = new WebSocket(`ws://127.0.0.1:${port}`);
+    await once(client, "open");
+    const closed = once(client, "close");
+    client.send(
+      JSON.stringify({
+        id: "large",
+        requestType: "highlight",
+        language: "javascript",
+        code: "a".repeat(2048),
+      }),
+    );
+    const [code] = await closed;
+    assert.equal(code, 1009);
+  } finally {
+    await server.stop();
+  }
+});
+
+test("detectLanguage rejects non-string fields without leaking internals", async () => {
+  const server = new NSHServer();
+  try {
+    await server.start();
+    const client = await connect(server);
+    const response = await request(client, {
+      id: "detect",
+      requestType: "detectLanguage",
+      path: "/a.ts",
+      ext: 123,
+    });
+    assert.equal(response.success, false);
+    assert.match(response.error, /ext must be a string/);
+    const line = await request(client, {
+      id: "line",
+      requestType: "highlightLine",
+      language: "javascript",
+      code: "x",
+      initialState: Array.from({ length: 100 }, () => "root"),
+    });
+    assert.equal(line.success, false);
+    const update = await request(client, {
+      id: "update",
+      requestType: "openDocument",
+      documentId: "doc",
+      language: "javascript",
+      code: "a",
+    });
+    assert.equal(update.success, true);
+    const invalidUpdate = await request(client, {
+      id: "invalid-update",
+      requestType: "updateDocument",
+      documentId: "doc",
+      startLine: 0,
+      deletedLines: 1,
+      insertedLines: ["a\nb"],
+    });
+    assert.equal(invalidUpdate.success, false);
+    client.close();
+    await once(client, "close");
   } finally {
     await server.stop();
   }
