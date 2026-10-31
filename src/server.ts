@@ -1,2 +1,10 @@
 export { NSHServer } from "./core/Socket";
-export type { HighlightRequest, HighlightResponse } from "./types/socket";
+export type {
+  DetectLanguageResponse,
+  HighlightRequest,
+  HighlightResponse,
+  NSHServerAuthenticate,
+  NSHServerOptions,
+  NSHServerRequestInfo,
+  SupportedLanguageResponse,
+} from "./types/socket";

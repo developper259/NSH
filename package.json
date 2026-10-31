@@ -19,27 +19,31 @@
       "import": "./dist/esm/server.js",
       "require": "./dist/cjs/server.js"
     },
-    "./themes/*": "./dist/themes/*"
+    "./themes/*": "./dist/themes/*",
+    "./package.json": "./package.json"
   },
   "files": [
     "dist",
+    "src",
     "README.md",
     "LICENSE"
   ],
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "clean": "node scripts/clean.js",
     "build": "npm run clean && tsc -p tsconfig.cjs.json && tsc -p tsconfig.types.json && node scripts/build-esm-wrapper.js && node scripts/copy-themes.js",
     "build:cjs": "tsc -p tsconfig.cjs.json",
-    "build:esm": "node scripts/build-esm-wrapper.js",
+    "build:esm": "npm run build:cjs && node scripts/build-esm-wrapper.js",
     "typecheck": "tsc --noEmit",
-    "test": "npm run build && node --test test/*.test.js",
+    "test": "npm run build && node --test test",
     "test:package": "npm run build && node test/package.test.js",
     "benchmark": "npm run build && node benchmark/index.js",
     "benchmark:smoke": "npm run build && node benchmark/smoke.js",
-    "prepack": "npm run build",
-    "prepare": "npm run build",
+    "prepare": "node scripts/prepare.js",
     "dev": "tsc --watch",
-    "start": "npm run build && node dist/cjs/index.js",
+    "start": "npm run build && node scripts/cli.js",
     "socket": "npm run build && node test/index.js"
   },
   "dependencies": {

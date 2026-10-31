@@ -8,15 +8,21 @@ const test = require("node:test");
 const ROOT = path.join(__dirname, "..");
 
 function run(command, args, cwd) {
-  return execFileSync(command, args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+  return execFileSync(command, args, {
+    cwd,
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+    shell: process.platform === "win32" && command === "npm",
+  });
 }
 
 test("npm pack + install in a temp project exposes CJS, ESM, types and themes", { timeout: 120000 }, () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "nsh-package-"));
+  let tarball;
   try {
     const packOutput = run("npm", ["pack", "--json"], ROOT);
     const packInfo = JSON.parse(packOutput);
-    const tarball = path.join(ROOT, packInfo[0].filename);
+    tarball = path.join(ROOT, packInfo[0].filename);
     assert.ok(fs.existsSync(tarball), "tarball was not created");
 
     run("npm", ["init", "-y"], tmp);
@@ -40,9 +46,26 @@ test("npm pack + install in a temp project exposes CJS, ESM, types and themes", 
 
     assert.ok(fs.existsSync(path.join(nodeModules, "dist", "themes", "dark.css")), "dark.css missing");
     assert.ok(fs.existsSync(path.join(nodeModules, "dist", "themes", "light.css")), "light.css missing");
+    assert.ok(fs.existsSync(path.join(nodeModules, "src", "index.ts")), "source files missing");
 
-    fs.rmSync(tarball, { force: true });
+    const declarationMap = JSON.parse(
+      fs.readFileSync(path.join(nodeModules, "dist", "cjs", "index.js.map"), "utf8"),
+    );
+    assert.ok(
+      declarationMap.sources.some((source) => source.includes("src/index.ts")),
+      "source map does not reference the shipped source",
+    );
+    const packageJson = JSON.parse(
+      run("node", ["-e", "console.log(JSON.stringify(require('nsh/package.json')))"], tmp),
+    );
+    assert.equal(packageJson.name, "nsh");
+    const serverTypes = fs.readFileSync(
+      path.join(nodeModules, "dist", "types", "server.d.ts"),
+      "utf8",
+    );
+    assert.match(serverTypes, /NSHServerOptions/);
   } finally {
+    if (tarball) fs.rmSync(tarball, { force: true });
     fs.rmSync(tmp, { recursive: true, force: true });
   }
 });
