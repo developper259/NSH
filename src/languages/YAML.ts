@@ -11,10 +11,11 @@ import {
 export class YAML implements LanguageDefinition {
   name = "yaml";
   extensions = [".yml", ".yaml"];
+  aliases = ["yml"];
 
   private yamlKeywords = ["true", "false", "null", "yes", "no", "on", "off"];
 
-  public tokenTypes: TokenType[] = [
+  private readonly rootRules: TokenType[] = [
     {
       name: "comment",
       pattern: /#.*/g,
@@ -58,10 +59,6 @@ export class YAML implements LanguageDefinition {
     },
   ];
 
-  public getTokenTypes(): TokenType[] {
-    return this.tokenTypes;
-  }
-
   public getStates(): Record<string, TokenType[]> {
     return {
       root: [
@@ -71,7 +68,7 @@ export class YAML implements LanguageDefinition {
           className: "nsh-operator",
           push: blockScalarPush,
         },
-        ...this.tokenTypes,
+        ...this.rootRules,
       ],
       inBlockScalar: [
         {
@@ -89,8 +86,6 @@ export class YAML implements LanguageDefinition {
     };
   }
 
-  comments = { singleLine: "#" };
-  strings = { startEnd: ['"', "'"], escapeChar: "\\" };
 }
 
 const blockScalarPush: StatePushResolver = (

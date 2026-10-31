@@ -376,10 +376,6 @@ class ExampleLanguage implements LanguageDefinition {
     },
   ];
 
-  getTokenTypes(): TokenType[] {
-    return this.root;
-  }
-
   getStates(): Record<string, TokenType[]> {
     return {
       root: this.root,
@@ -438,7 +434,7 @@ inComment: [
 Rules may use:
 
 ```ts
-push?: string;
+push?: string | StatePushResolver;
 pop?: boolean;
 popTo?: string;
 popPrefix?: string;
@@ -446,7 +442,8 @@ context?: (
   line,
   position,
   tokens,
-  stateStack
+  stateStack,
+  lineIndex
 ) => boolean;
 ```
 
@@ -602,7 +599,6 @@ import {
   IncrementalDocument,
   Parser,
   LanguageRegistry,
-  ThemeManager,
 } from "nsh";
 ```
 

@@ -1,4 +1,4 @@
-import { StatePushResolver, Token, TokenType } from "./token";
+import { Token, TokenType } from "./token";
 
 export interface TokenizerOptions {
   maxStateDepth?: number;
@@ -36,5 +36,3 @@ export interface TokenContext {
   lastClosedBraceBlock: boolean;
   functionExpression: boolean;
 }
-
-export type { StatePushResolver };

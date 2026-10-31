@@ -1,68 +1,11 @@
 import { LanguageDefinition } from "../types/language";
 import { TokenType } from "../types/token";
-import { createStringToken, STRING_PATTERNS } from "./shared";
 
 export class XML implements LanguageDefinition {
   name = "xml";
   extensions = [".xml", ".xsd", ".xsl", ".xslt", ".svg", ".rss", ".atom"];
 
   private nameSource = "[a-zA-Z_][a-zA-Z0-9_.-]*(?::[a-zA-Z_][a-zA-Z0-9_.-]*)?";
-
-  public tokenTypes: TokenType[] = [
-    {
-      name: "xml-decl",
-      pattern: /<\?xml[\s\S]*?\?>/gi,
-      className: "nsh-keyword",
-    },
-    { name: "doctype", pattern: /<!DOCTYPE[^>]*>/gi, className: "nsh-keyword" },
-    {
-      name: "tag-open",
-      pattern: new RegExp(`<${this.nameSource}`, "g"),
-      className: "nsh-keyword",
-    },
-    {
-      name: "tag-close",
-      pattern: new RegExp(`<\\/${this.nameSource}`, "g"),
-      className: "nsh-keyword",
-    },
-    { name: "tag-selfclose", pattern: /\/>/g, className: "nsh-keyword" },
-    { name: "tag-bracket", pattern: />/g, className: "nsh-keyword" },
-    createStringToken([
-      STRING_PATTERNS.doubleQuote,
-      STRING_PATTERNS.singleQuote,
-    ]),
-    {
-      name: "attribute",
-      pattern: new RegExp(`${this.nameSource}(?=\\s*=)`, "g"),
-      className: "nsh-variable",
-    },
-    {
-      name: "operator",
-      pattern: /=/g,
-      className: "nsh-operator",
-    },
-    {
-      name: "attribute-value",
-      pattern: /(?<==\s*)[^\s"'<>=]+/g,
-      className: "nsh-string",
-    },
-    { name: "comment", pattern: /<!--[\s\S]*?-->/g, className: "nsh-comment" },
-    {
-      name: "cdata",
-      pattern: /<!\[CDATA\[[\s\S]*?\]\]>/g,
-      className: "nsh-string",
-    },
-    { name: "entity", pattern: /&(?:#\d+|#x[0-9a-fA-F]+|[a-zA-Z][a-zA-Z0-9]*);/g, className: "nsh-number" },
-    {
-      name: "processing-instruction",
-      pattern: /<\?[\s\S]*?\?>/g,
-      className: "nsh-comment",
-    },
-  ];
-
-  public getTokenTypes(): TokenType[] {
-    return this.tokenTypes;
-  }
 
   public getStates(): Record<string, TokenType[]> {
     const tagAttributeRules: TokenType[] = [
@@ -275,6 +218,4 @@ export class XML implements LanguageDefinition {
     };
   }
 
-  comments = { multiLine: { start: "<!--", end: "-->" } };
-  strings = { startEnd: ['"', "'"], escapeChar: "\\" };
 }

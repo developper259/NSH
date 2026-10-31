@@ -179,64 +179,6 @@ export class Java implements LanguageDefinition {
     "sort",
   ];
 
-  public tokenTypes: TokenType[] = [
-    createKeywordToken(this.javaKeywords),
-    {
-      name: "type",
-      pattern: new RegExp(`\\b(${this.javaTypes.join("|")})\\b`, "g"),
-      className: "nsh-keyword",
-    },
-    {
-      name: "builtin",
-      pattern: new RegExp(`\\b(${this.javaBuiltins.join("|")})\\b`, "g"),
-      className: "nsh-function",
-    },
-    {
-      name: "decorator",
-      pattern: /@[a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)*/g,
-      className: "nsh-function",
-    },
-    createStringToken([
-      STRING_PATTERNS.tripleDouble,
-      STRING_PATTERNS.doubleQuote,
-      STRING_PATTERNS.singleQuote,
-    ]),
-    createNumberToken([
-      NUMBER_PATTERNS.hex,
-      NUMBER_PATTERNS.binary,
-      NUMBER_PATTERNS.octal,
-      NUMBER_PATTERNS.scientific,
-      /\b\d[\d_]*\.\d[\d_]*[fFdD]?\b/g,
-      /\b\d[\d_]*[lLfFdD]?\b/g,
-    ]),
-    createCommentToken(/\/\*\*[\s\S]*?\*\//g),
-    createCommentToken(COMMENT_PATTERNS.multiLine.slashStar),
-    createCommentToken(COMMENT_PATTERNS.singleLine.doubleSlash),
-    {
-      name: "generic",
-      pattern: /(?<=[a-zA-Z_$])<[a-zA-Z][a-zA-Z0-9_,\s<>\[\]?]*>/g,
-      className: "nsh-keyword",
-    },
-    createFunctionToken(),
-    { name: "arrow-function", pattern: /->/g, className: "nsh-operator" },
-    { name: "bracket", pattern: /[\[\]\{\}\(\)]/g, className: "nsh-bracket" },
-    {
-      name: "operator",
-      pattern: /[+\-*/%=<>!&|^~?:;,.]/g,
-      className: "nsh-operator",
-    },
-    createVariableToken(),
-    {
-      name: "annotation-marker",
-      pattern: /@/g,
-      className: "nsh-function",
-    },
-  ];
-
-  public getTokenTypes(): TokenType[] {
-    return this.tokenTypes;
-  }
-
   public getStates(): Record<string, TokenType[]> {
     return {
       root: [
@@ -354,6 +296,4 @@ export class Java implements LanguageDefinition {
     };
   }
 
-  comments = { singleLine: "//", multiLine: { start: "/*", end: "*/" } };
-  strings = { startEnd: ['"', "'", '"""'], escapeChar: "\\" };
 }

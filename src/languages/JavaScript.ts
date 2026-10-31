@@ -16,6 +16,7 @@ import {
 export class JavaScript implements LanguageDefinition {
   name = "javascript";
   extensions = [".js", ".mjs"];
+  aliases = ["js"];
 
   private jsKeywords = [
     "var",
@@ -179,60 +180,6 @@ export class JavaScript implements LanguageDefinition {
     "clearTimeout",
   ];
 
-  public tokenTypes: TokenType[] = [
-    createKeywordToken(this.jsKeywords),
-    {
-      name: "builtin",
-      pattern: new RegExp(`\\b(${this.jsBuiltins.join("|")})\\b`, "g"),
-      className: "nsh-function",
-    },
-    createStringToken([
-      STRING_PATTERNS.singleQuote,
-      STRING_PATTERNS.doubleQuote,
-      STRING_PATTERNS.backtick,
-    ]),
-    {
-      name: "template-expression",
-      pattern: /\$\{[^}]*\}/g,
-      className: "nsh-variable",
-    },
-    createNumberToken([
-      NUMBER_PATTERNS.bigint,
-      NUMBER_PATTERNS.integer,
-      NUMBER_PATTERNS.decimal,
-      NUMBER_PATTERNS.hex,
-      NUMBER_PATTERNS.binary,
-      NUMBER_PATTERNS.octal,
-      NUMBER_PATTERNS.scientific,
-    ]),
-    createCommentToken(COMMENT_PATTERNS.multiLine.slashStar),
-    createCommentToken(COMMENT_PATTERNS.singleLine.doubleSlash),
-    {
-      name: "regex",
-      pattern: REGEX_PATTERN,
-      className: "nsh-string",
-    },
-    createFunctionToken(),
-    { name: "arrow-function", pattern: /=>/g, className: "nsh-operator" },
-    { name: "bracket", pattern: /[\[\]\{\}\(\)]/g, className: "nsh-bracket" },
-    { name: "spread", pattern: /\.\.\./g, className: "nsh-operator" },
-    {
-      name: "operator",
-      pattern: /[+\-*/%=<>!&|^~?:;,.]/g,
-      className: "nsh-operator",
-    },
-    createVariableToken(),
-    {
-      name: "jsx-tag",
-      pattern: /<\/?[a-zA-Z][a-zA-Z0-9]*/g,
-      className: "nsh-keyword",
-    },
-  ];
-
-  public getTokenTypes(): TokenType[] {
-    return this.tokenTypes;
-  }
-
   public getStates(): Record<string, TokenType[]> {
     return {
       root: [
@@ -343,6 +290,4 @@ export class JavaScript implements LanguageDefinition {
     };
   }
 
-  comments = { singleLine: "//", multiLine: { start: "/*", end: "*/" } };
-  strings = { startEnd: ['"', "'", "`"], escapeChar: "\\" };
 }

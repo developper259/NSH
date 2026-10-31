@@ -1,14 +1,6 @@
 import { Token } from '../types/token';
-
-export interface ParsedLine {
-  lineNumber: number;
-  tokens: Token[];
-}
-
-export interface ParsedCode {
-  lines: ParsedLine[];
-  totalLines: number;
-}
+import { ParsedCode, ParsedLine } from '../types/parser';
+import { groupTokensByLine } from '../utils/TokenGrouping';
 
 export class Parser {
   private tokens: Token[];
@@ -20,22 +12,15 @@ export class Parser {
   }
 
   public parse(): ParsedCode {
-    const linesMap = new Map<number, Token[]>();
+    const linesMap = groupTokensByLine(this.tokens);
 
-    for (const token of this.tokens) {
-      if (!linesMap.has(token.line)) {
-        linesMap.set(token.line, []);
-      }
-      linesMap.get(token.line)!.push(token);
-    }
-
-    const lines: ParsedLine[] = [];
     let highestTokenLine = 0;
     for (const lineNumber of linesMap.keys()) {
       if (lineNumber > highestTokenLine) highestTokenLine = lineNumber;
     }
     const totalLines = Math.max(this.sourceLineCount || 0, highestTokenLine);
 
+    const lines: ParsedLine[] = [];
     for (let i = 1; i <= totalLines; i++) {
       lines.push({
         lineNumber: i,
@@ -49,7 +34,8 @@ export class Parser {
     };
   }
 
-  public setTokens(tokens: Token[]): void {
+  public setTokens(tokens: Token[], source?: string): void {
     this.tokens = tokens;
+    this.sourceLineCount = source === undefined ? undefined : source.split("\n").length;
   }
 }

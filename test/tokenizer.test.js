@@ -26,7 +26,6 @@ test("caches language states until the language changes", () => {
   const language = {
     name: "counted",
     extensions: [".counted"],
-    getTokenTypes: () => [],
     getStates: () => {
       stateCalls += 1;
       return { root: [{ name: "word", pattern: /[a-z]+/g }] };

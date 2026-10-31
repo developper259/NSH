@@ -7,6 +7,8 @@ export interface CachedLineState {
   stateAfter: string[];
 }
 
+export interface InternalLineState extends CachedLineState {}
+
 export interface IncrementalUpdate {
   startLine: number;
   deletedLines: number;

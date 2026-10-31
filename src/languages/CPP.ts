@@ -5,9 +5,7 @@ import {
   createFunctionToken,
   createVariableToken,
   createCommentToken,
-  createStringToken,
   createNumberToken,
-  STRING_PATTERNS,
   NUMBER_PATTERNS,
   COMMENT_PATTERNS,
 } from "./shared";
@@ -15,6 +13,7 @@ import {
 export class CPP implements LanguageDefinition {
   name = "cpp";
   extensions = [".cpp", ".cc", ".cxx", ".hpp", ".hh", ".hxx", ".h++"];
+  aliases = ["c++"];
 
   private cppKeywords = [
     "alignas",
@@ -218,64 +217,6 @@ export class CPP implements LanguageDefinition {
     "assert",
   ];
 
-  public tokenTypes: TokenType[] = [
-    {
-      name: "preprocessor",
-      pattern:
-        /#\s*(?:include|define|undef|ifdef|ifndef|elif|else|endif|pragma|error|warning|line|if)\b.*/g,
-      className: "nsh-keyword",
-    },
-    createKeywordToken(this.cppKeywords),
-    {
-      name: "type",
-      pattern: new RegExp(`\\b(${this.cppTypes.join("|")})\\b`, "g"),
-      className: "nsh-keyword",
-    },
-    {
-      name: "builtin",
-      pattern: new RegExp(`\\b(${this.cppBuiltins.join("|")})\\b`, "g"),
-      className: "nsh-function",
-    },
-    createStringToken([
-      STRING_PATTERNS.doubleQuote,
-      STRING_PATTERNS.singleQuote,
-    ]),
-    createNumberToken([
-      NUMBER_PATTERNS.hex,
-      NUMBER_PATTERNS.binary,
-      NUMBER_PATTERNS.octal,
-      NUMBER_PATTERNS.scientific,
-      /\b\d[\d']*\.\d[\d']*[fFlL]?\b/g,
-      /\b\d[\d']*[uUlLfF]*\b/g,
-    ]),
-    createCommentToken(COMMENT_PATTERNS.multiLine.slashStar),
-    createCommentToken(COMMENT_PATTERNS.singleLine.doubleSlash),
-    { name: "scope-resolution", pattern: /::/g, className: "nsh-operator" },
-    {
-      name: "generic",
-      pattern: /<[a-zA-Z0-9_,:\s<>\[\]*&]+>/g,
-      className: "nsh-keyword",
-    },
-    createFunctionToken(),
-    {
-      name: "pointer",
-      pattern: /[*&](?=\s*[a-zA-Z_])/g,
-      className: "nsh-operator",
-    },
-    { name: "arrow-function", pattern: /->/g, className: "nsh-operator" },
-    { name: "bracket", pattern: /[\[\]\{\}\(\)]/g, className: "nsh-bracket" },
-    {
-      name: "operator",
-      pattern: /[+\-*/%=<>!&|^~?:;,.]/g,
-      className: "nsh-operator",
-    },
-    createVariableToken(),
-  ];
-
-  public getTokenTypes(): TokenType[] {
-    return this.tokenTypes;
-  }
-
   public getStates(): Record<string, TokenType[]> {
     return {
       root: [
@@ -398,8 +339,6 @@ export class CPP implements LanguageDefinition {
     };
   }
 
-  comments = { singleLine: "//", multiLine: { start: "/*", end: "*/" } };
-  strings = { startEnd: ['"', "'"], escapeChar: "\\" };
 }
 
 const rawStringPush: StatePushResolver = (

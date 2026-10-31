@@ -10,7 +10,6 @@ import {
   HighlightResponse,
   NSHServerAuthenticate,
   NSHServerOptions,
-  ServerClientDocument,
   ServerClientState,
   ServerUpgradeInfo,
   ServerValidationLimits,

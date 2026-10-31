@@ -5,9 +5,7 @@ import {
   createFunctionToken,
   createVariableToken,
   createCommentToken,
-  createStringToken,
   createNumberToken,
-  STRING_PATTERNS,
   NUMBER_PATTERNS,
   COMMENT_PATTERNS,
 } from "./shared";
@@ -161,57 +159,6 @@ export class C implements LanguageDefinition {
     "bsearch",
   ];
 
-  public tokenTypes: TokenType[] = [
-    {
-      name: "preprocessor",
-      pattern:
-        /#\s*(?:include|define|undef|ifdef|ifndef|elif|else|endif|pragma|error|warning|line|if)\b.*/g,
-      className: "nsh-keyword",
-    },
-    createKeywordToken(this.cKeywords),
-    {
-      name: "type",
-      pattern: new RegExp(`\\b(${this.cTypes.join("|")})\\b`, "g"),
-      className: "nsh-keyword",
-    },
-    {
-      name: "builtin",
-      pattern: new RegExp(`\\b(${this.cBuiltins.join("|")})\\b`, "g"),
-      className: "nsh-function",
-    },
-    createStringToken([
-      STRING_PATTERNS.doubleQuote,
-      STRING_PATTERNS.singleQuote,
-    ]),
-    createNumberToken([
-      NUMBER_PATTERNS.hex,
-      NUMBER_PATTERNS.binary,
-      NUMBER_PATTERNS.octal,
-      NUMBER_PATTERNS.scientific,
-      /\b\d[\d']*\.\d[\d']*[fFlL]?\b/g,
-      /\b\d[\d']*[uUlLfF]*\b/g,
-    ]),
-    createCommentToken(COMMENT_PATTERNS.multiLine.slashStar),
-    createCommentToken(COMMENT_PATTERNS.singleLine.doubleSlash),
-    createFunctionToken(),
-    {
-      name: "pointer",
-      pattern: /\*(?=\s*[a-zA-Z_])/g,
-      className: "nsh-operator",
-    },
-    { name: "bracket", pattern: /[\[\]\{\}\(\)]/g, className: "nsh-bracket" },
-    {
-      name: "operator",
-      pattern: /[+\-*/%=<>!&|^~?:;,.]/g,
-      className: "nsh-operator",
-    },
-    createVariableToken(),
-  ];
-
-  public getTokenTypes(): TokenType[] {
-    return this.tokenTypes;
-  }
-
   public getStates(): Record<string, TokenType[]> {
     return {
       root: [
@@ -305,6 +252,4 @@ export class C implements LanguageDefinition {
     };
   }
 
-  comments = { singleLine: "//", multiLine: { start: "/*", end: "*/" } };
-  strings = { startEnd: ['"', "'"], escapeChar: "\\" };
 }

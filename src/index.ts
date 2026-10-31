@@ -2,9 +2,7 @@ export { Tokenizer } from './core/Tokenizer';
 export { IncrementalDocument } from './core/IncrementalDocument';
 export { Parser } from './core/Parser';
 export { Highlighter } from './core/Highlighter';
-export { ThemeManager } from './core/ThemeManager';
-export { LanguageRegistry } from './core/LanguageRegistry';
-
+export { LanguageRegistry, normalizeExtension } from './core/LanguageRegistry';
 
 export { JavaScript } from './languages/JavaScript';
 export { TypeScript } from './languages/TypeScript';
@@ -20,10 +18,18 @@ export { CPP } from './languages/CPP';
 export { C } from './languages/C';
 export { CSV } from './languages/CSV';
 
-export type { Token, TokenType } from './types/token';
+export type { Token, TokenType, StatePushResolver } from './types/token';
 export type { CachedLineState, IncrementalUpdate } from './types/incremental';
-export type { ThemeInfo } from './types/theme';
+export type { ParsedCode, ParsedLine } from './types/parser';
+export type { TokenizerOptions } from './types/tokenizer';
 export type { LanguageDefinition } from './types/language';
-export type { HighlightOptions, HighlightResult } from './types/highlighter';
-export type { HighlightRequest, HighlightResponse, NSHServerOptions } from './types/socket';
-export type { DetectLanguageResponse, SupportedLanguageResponse } from './types/socket';
+export type { HighlightOptions, HighlightResult, LineHighlightResult } from './types/highlighter';
+export type {
+  DetectLanguageResponse,
+  HighlightRequest,
+  HighlightResponse,
+  NSHServerAuthenticate,
+  NSHServerOptions,
+  NSHServerRequestInfo,
+  SupportedLanguageResponse,
+} from './types/socket';

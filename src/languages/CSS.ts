@@ -131,12 +131,6 @@ export class CSS implements LanguageDefinition {
   private pseudoClassPattern =
     /:{1,2}(?:hover|active|focus|focus-within|focus-visible|visited|link|target|checked|disabled|enabled|required|optional|valid|invalid|root|empty|first-child|last-child|only-child|first-of-type|last-of-type|only-of-type|nth-child|nth-last-child|nth-of-type|nth-last-of-type|not|is|where|has|placeholder-shown|read-only|read-write|fullscreen|before|after|first-letter|first-line|selection|placeholder|marker|backdrop)\b/;
 
-  private commentRule: TokenType = {
-    name: "comment",
-    pattern: /\/\*[\s\S]*?\*\//g,
-    className: "nsh-comment",
-  };
-
   private stringRule: TokenType = createStringToken([
     STRING_PATTERNS.doubleQuote,
     STRING_PATTERNS.singleQuote,
@@ -221,27 +215,6 @@ export class CSS implements LanguageDefinition {
     className: "nsh-operator",
   };
 
-  public tokenTypes: TokenType[] = [
-    this.commentRule,
-    this.stringRule,
-    this.atRule,
-    this.variableRule,
-    this.functionRule,
-    this.hexColorRule,
-    this.pseudoClassRule,
-    this.propertyRule,
-    this.numberRule,
-    this.selectorTagRule,
-    this.selectorClassRule,
-    this.selectorIdRule,
-    this.valueIdentifierRule,
-    this.operatorRule,
-  ];
-
-  public getTokenTypes(): TokenType[] {
-    return this.tokenTypes;
-  }
-
   public getStates(): Record<string, TokenType[]> {
     return {
       root: [
@@ -316,6 +289,4 @@ export class CSS implements LanguageDefinition {
     className: "nsh-operator",
   };
 
-  comments = { multiLine: { start: "/*", end: "*/" } };
-  strings = { startEnd: ['"', "'"], escapeChar: "\\" };
 }

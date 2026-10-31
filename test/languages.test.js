@@ -600,9 +600,6 @@ test("class conversion is non-destructive and HTML uses custom classes", () => {
   const language = {
     name: "custom-test",
     extensions: [".custom-test"],
-    getTokenTypes: () => [
-      { name: "custom", pattern: /hello/g, className: "my-custom-class" },
-    ],
     getStates: () => ({
       root: [
         { name: "custom", pattern: /hello/g, className: "my-custom-class" },

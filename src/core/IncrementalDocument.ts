@@ -1,13 +1,10 @@
 import { Tokenizer } from "./Tokenizer";
-import { CachedLineState, IncrementalUpdate } from "../types/incremental";
+import {
+  CachedLineState,
+  IncrementalUpdate,
+  InternalLineState,
+} from "../types/incremental";
 import { Token } from "../types/token";
-
-interface InternalLineState {
-  text: string;
-  tokens: Token[];
-  stateBefore: string[];
-  stateAfter: string[];
-}
 
 export class IncrementalDocument {
   private readonly tokenizer: Tokenizer;
@@ -28,12 +25,7 @@ export class IncrementalDocument {
   }
 
   public getText(): string {
-    let text = "";
-    for (let index = 0; index < this.lines.length; index += 1) {
-      if (index > 0) text += "\n";
-      text += this.lines[index].text;
-    }
-    return text;
+    return this.lines.map((line) => line.text).join("\n");
   }
 
   public getTokens(): Token[] {
@@ -82,8 +74,6 @@ export class IncrementalDocument {
     if (deletedLines > this.lines.length - startLine) {
       throw new RangeError("deletedLines exceeds the document length");
     }
-
-    const lineDelta = insertedLines.length - deletedLines;
 
     if (
       deletedLines === insertedLines.length &&

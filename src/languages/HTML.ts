@@ -3,76 +3,14 @@ import { TokenType } from "../types/token";
 import { JavaScript } from "./JavaScript";
 import { CSS } from "./CSS";
 import { createEmbeddedStates } from "../utils/EmbedLanguage";
-import {
-  createStringToken,
-  STRING_PATTERNS,
-  createCommentToken,
-  COMMENT_PATTERNS,
-} from "./shared";
 
 export class HTML implements LanguageDefinition {
   name = "html";
   extensions = [".html", ".htm"];
+  aliases = ["htm"];
 
   private js = new JavaScript();
   private css = new CSS();
-
-  public tokenTypes: TokenType[] = [
-    { name: "doctype", pattern: /<!DOCTYPE[^>]*>/gi, className: "nsh-keyword" },
-    {
-      name: "tag-open",
-      pattern: /<[a-zA-Z0-9_-]+/g,
-      className: "nsh-keyword",
-    },
-    {
-      name: "tag-close",
-      pattern: /<\/[a-zA-Z0-9_-]+/g,
-      className: "nsh-keyword",
-    },
-    { name: "tag-selfclose", pattern: /\/>/g, className: "nsh-keyword" },
-    { name: "tag-bracket", pattern: />/g, className: "nsh-keyword" },
-    createStringToken([
-      STRING_PATTERNS.doubleQuote,
-      STRING_PATTERNS.singleQuote,
-    ]),
-    {
-      name: "attribute",
-      pattern: /[a-zA-Z0-9_-]+(?=\s*=)/g,
-      className: "nsh-variable",
-    },
-    {
-      name: "operator",
-      pattern: /=/g,
-      className: "nsh-operator",
-    },
-    {
-      name: "attribute-value",
-      pattern: /(?<==\s*)[^\s"'<>=]+/g,
-      className: "nsh-string",
-    },
-    {
-      name: "attribute",
-      pattern: /[a-zA-Z0-9_-]+/g,
-      className: "nsh-variable",
-    },
-    createCommentToken(COMMENT_PATTERNS.multiLine.dashDash),
-    {
-      name: "cdata",
-      pattern: /<!\[CDATA\[[\s\S]*?\]\]>/g,
-      className: "nsh-string",
-    },
-    { name: "entity", pattern: /&[a-zA-Z0-9#]+;/g, className: "nsh-number" },
-    {
-      name: "processing-instruction",
-      pattern: /<\?[\s\S]*?\?>/g,
-      className: "nsh-comment",
-    },
-    { name: "text", pattern: /[^<&]+/g },
-  ];
-
-  public getTokenTypes(): TokenType[] {
-    return this.tokenTypes;
-  }
 
   public getStates(): Record<string, TokenType[]> {
     const jsStates = createEmbeddedStates({
@@ -371,6 +309,4 @@ export class HTML implements LanguageDefinition {
     };
   }
 
-  comments = { multiLine: { start: "<!--", end: "-->" } };
-  strings = { startEnd: ['"', "'"], escapeChar: "\\" };
 }

@@ -13,6 +13,7 @@ import {
 export class Python implements LanguageDefinition {
   name = "python";
   extensions = [".py", ".pyw"];
+  aliases = ["py"];
 
   private pyKeywords = [
     "def",
@@ -128,63 +129,6 @@ export class Python implements LanguageDefinition {
     "datetime",
     "time",
   ];
-
-  public tokenTypes: TokenType[] = [
-    createKeywordToken(this.pyKeywords),
-    {
-      name: "builtin",
-      pattern: new RegExp(`\\b(${this.pyBuiltins.join("|")})\\b`, "g"),
-      className: "nsh-function",
-    },
-    { name: "decorator", pattern: /@\w+(\.\w+)*/g, className: "nsh-function" },
-    {
-      name: "string",
-      pattern:
-        /(?:[rRbBuUfF]{1,2})"""[\s\S]*?"""|(?:[rRbBuUfF]{1,2})'''[\s\S]*?'''|f"[^"]*"|f'[^']*'|r"[^"]*"|r'[^']*'|b"[^"]*"|b'[^']*'|"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'/g,
-      className: "nsh-string",
-    },
-    createNumberToken([
-      /\b\d+(?:\.\d+)?\+\d+(?:\.\d+)?[jJ]\b/g,
-      /\b\d+(?:\.\d+)?[jJ]\b/g,
-      NUMBER_PATTERNS.hex,
-      NUMBER_PATTERNS.binary,
-      NUMBER_PATTERNS.octal,
-      NUMBER_PATTERNS.scientific,
-      NUMBER_PATTERNS.decimal,
-      NUMBER_PATTERNS.integer,
-    ]),
-    createCommentToken(COMMENT_PATTERNS.singleLine.hash),
-    {
-      name: "type-hint",
-      pattern:
-        /:\s*(?:[a-zA-Z_][a-zA-Z0-9_]*\s*(?:\[[^\]]*\])?\s*(?:\|\s*[a-zA-Z_][a-zA-Z0-9_]*\s*(?:\[[^\]]*\])?)*|list\[[^\]]*\]|dict\[[^\]]*\]|Callable\[[^\]]*\]|Optional\[[^\]]*\]|Tuple\[[^\]]*\]|Set\[[^\]]*\]|Any|None)(?=\s*(?:,|\)|=|:))/g,
-      className: "nsh-keyword",
-      context: isTypeHintContext,
-    },
-    createFunctionToken(),
-    {
-      name: "comparison",
-      pattern: /(==|!=|<=|>=|<|>)/g,
-      className: "nsh-operator",
-    },
-    {
-      name: "assignment",
-      pattern: /(=|\+=|\-=|\*=|\/=|%=|\*\*=|\/\/=|&=|\|=|\^=|>>=|<<=)/g,
-      className: "nsh-operator",
-    },
-    { name: "walrus", pattern: /:=/g, className: "nsh-operator" },
-    createVariableToken(),
-    { name: "bracket", pattern: /[\[\]\{\}\(\)]/g, className: "nsh-bracket" },
-    {
-      name: "operator",
-      pattern: /[+\-*/%=!&|^~?:;,.]/g,
-      className: "nsh-operator",
-    },
-  ];
-
-  public getTokenTypes(): TokenType[] {
-    return this.tokenTypes;
-  }
 
   public getStates(): Record<string, TokenType[]> {
     return {
@@ -345,8 +289,6 @@ export class Python implements LanguageDefinition {
     };
   }
 
-  comments = { singleLine: "#" };
-  strings = { startEnd: ['"', "'", '"""', "'''"], escapeChar: "\\" };
 }
 
 function isTypeHintContext(

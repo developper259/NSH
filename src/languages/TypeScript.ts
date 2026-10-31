@@ -16,6 +16,7 @@ import {
 export class TypeScript implements LanguageDefinition {
   name = "typescript";
   extensions = [".ts"];
+  aliases = ["ts"];
 
   private tsKeywords = [
     "var",
@@ -169,83 +170,6 @@ export class TypeScript implements LanguageDefinition {
     "module",
     "exports",
   ];
-
-  public tokenTypes: TokenType[] = [
-    createKeywordToken(this.tsKeywords),
-    {
-      name: "type",
-      pattern: new RegExp(`\\b(${this.tsTypes.join("|")})\\b`, "g"),
-      className: "nsh-type",
-          context: isRootTypeReference,
-    },
-    {
-      name: "builtin",
-      pattern: new RegExp(`\\b(${this.tsBuiltins.join("|")})\\b`, "g"),
-      className: "nsh-function",
-    },
-    createStringToken([
-      STRING_PATTERNS.singleQuote,
-      STRING_PATTERNS.doubleQuote,
-      STRING_PATTERNS.backtick,
-    ]),
-    {
-      name: "template-expression",
-      pattern: /\$\{[^}]*\}/g,
-      className: "nsh-variable",
-    },
-    createNumberToken([
-      NUMBER_PATTERNS.bigint,
-      NUMBER_PATTERNS.scientific,
-      NUMBER_PATTERNS.decimal,
-      NUMBER_PATTERNS.hex,
-      NUMBER_PATTERNS.binary,
-      NUMBER_PATTERNS.octal,
-      NUMBER_PATTERNS.integer,
-    ]),
-    createCommentToken(COMMENT_PATTERNS.multiLine.slashStar),
-    createCommentToken(COMMENT_PATTERNS.singleLine.doubleSlash),
-    { name: "jsdoc", pattern: /\/\*\*[\s\S]*?\*\//g, className: "nsh-comment" },
-    {
-      name: "regex",
-      pattern: REGEX_PATTERN,
-      className: "nsh-string",
-    },
-    {
-      name: "type-separator",
-      pattern: /:/g,
-      className: "nsh-operator",
-    },
-    {
-      name: "type-separator",
-      pattern: /[<>]/g,
-      className: "nsh-operator",
-    },
-    createFunctionToken(),
-    { name: "arrow-function", pattern: /=>/g, className: "nsh-operator" },
-    { name: "bracket", pattern: /[\[\]\{\}\(\)]/g, className: "nsh-bracket" },
-    { name: "spread", pattern: /\.\.\./g, className: "nsh-operator" },
-    { name: "non-null", pattern: /!/g, className: "nsh-operator" },
-    {
-      name: "optional-chaining",
-      pattern: /\?\?=?|\?\./g,
-      className: "nsh-operator",
-    },
-    {
-      name: "operator",
-      pattern: /[+\-*/%=<>!&|^~?:;,.]/g,
-      className: "nsh-operator",
-    },
-    createVariableToken(),
-    {
-      name: "jsx-tag",
-      pattern: /<\/?[a-zA-Z][a-zA-Z0-9]*/g,
-      className: "nsh-keyword",
-    },
-  ];
-
-  public getTokenTypes(): TokenType[] {
-    return this.tokenTypes;
-  }
 
   public getStates(): Record<string, TokenType[]> {
     return {
@@ -619,8 +543,6 @@ export class TypeScript implements LanguageDefinition {
     };
   }
 
-  comments = { singleLine: "//", multiLine: { start: "/*", end: "*/" } };
-  strings = { startEnd: ['"', "'", "`"], escapeChar: "\\" };
 }
 
 function isTypeAnnotationStart(
@@ -703,8 +625,8 @@ function shouldEndTypeAtLineStart(
 }
 
 function isReturnTypeObjectStart(
-  line: string,
-  position: number,
+  _line: string,
+  _position: number,
   tokens: Token[],
   stateStack: string[],
 ): boolean {

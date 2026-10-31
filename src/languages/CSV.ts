@@ -10,7 +10,7 @@ export class CSV implements LanguageDefinition {
   name = "csv";
   extensions = [".csv"];
 
-  public tokenTypes: TokenType[] = [
+  private readonly rootRules: TokenType[] = [
     {
       name: "csv-header",
       pattern: QUOTED_FIELD,
@@ -29,17 +29,11 @@ export class CSV implements LanguageDefinition {
     { name: "delimiter", pattern: /,/g, className: "nsh-operator" },
   ];
 
-  public getTokenTypes(): TokenType[] {
-    return this.tokenTypes;
-  }
-
   public getStates(): Record<string, TokenType[]> {
     return {
-      root: this.tokenTypes,
+      root: this.rootRules,
     };
   }
-
-  strings = { startEnd: ['"'] };
 }
 
 function isHeaderRow(

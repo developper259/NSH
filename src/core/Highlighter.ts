@@ -7,6 +7,7 @@ import {
 import { Tokenizer } from "./Tokenizer";
 import { LanguageDefinition } from "../types/language";
 import { defaultRegistry } from "../languages/Languages";
+import { groupTokensByLine } from "../utils/TokenGrouping";
 
 const CLASS_MAP: Readonly<Record<string, string>> = {
   keyword: "nsh-keyword", string: "nsh-string", number: "nsh-number",
@@ -66,11 +67,7 @@ export class Highlighter {
   }
 
   public static detectLanguage(extension: string): string | undefined {
-    const ext = extension.startsWith(".")
-      ? extension.toLowerCase()
-      : `.${extension.toLowerCase()}`;
-
-    return defaultRegistry.getLanguageByExtension(ext)?.name;
+    return defaultRegistry.getLanguageByExtension(extension)?.name;
   }
 
   public highlight(code: string): HighlightResult {
@@ -173,18 +170,18 @@ export class Highlighter {
 
   private generateHTML(code: string, tokens: Token[]): string {
     const lines = code.split("\n");
-    const linesMap = this.groupTokensByLine(tokens);
-
-    let html = `<div class="nsh-highlighter nsh-theme-${this.themeName}">`;
+    const linesMap = groupTokensByLine(tokens);
+    const chunks = [`<div class="nsh-highlighter nsh-theme-${this.themeName}">`];
 
     for (let i = 0; i < lines.length; i++) {
       const lineNumber = i + 1;
-      const lineTokens = linesMap.get(lineNumber) || [];
-      html += this.generateLineHTML(lines[i], lineTokens, lineNumber);
+      chunks.push(
+        this.generateLineHTML(lines[i], linesMap.get(lineNumber) || [], lineNumber),
+      );
     }
 
-    html += "</div>";
-    return html;
+    chunks.push("</div>");
+    return chunks.join("");
   }
 
   private generateLineHTML(
@@ -192,46 +189,31 @@ export class Highlighter {
     lineTokens: Token[],
     lineNumber: number,
   ): string {
-    let html = '<div class="nsh-line">';
+    const chunks = ['<div class="nsh-line">'];
 
     if (this.options.lineNumbers) {
-      html += `<span class="nsh-line-number">${lineNumber}</span>`;
+      chunks.push(`<span class="nsh-line-number">${lineNumber}</span>`);
     }
 
     let position = 0;
     for (const token of lineTokens) {
       if (token.column > position + 1) {
-        const plainText = line.substring(position, token.column - 1);
-        html += this.escapeHtml(plainText);
+        chunks.push(this.escapeHtml(line.substring(position, token.column - 1)));
         position = token.column - 1;
       }
 
       const className = normalizeClassNames(token.className) || this.getCssClass(token.type);
       const value = this.escapeHtml(token.value);
-      html += className ? `<span class="${className}">${value}</span>` : value;
+      chunks.push(className ? `<span class="${className}">${value}</span>` : value);
       position = token.column - 1 + token.value.length;
     }
 
     if (position < line.length) {
-      const plainText = line.substring(position);
-      html += this.escapeHtml(plainText);
+      chunks.push(this.escapeHtml(line.substring(position)));
     }
 
-    html += "</div>";
-    return html;
-  }
-
-  private groupTokensByLine(tokens: Token[]): Map<number, Token[]> {
-    const linesMap = new Map<number, Token[]>();
-
-    for (const token of tokens) {
-      if (!linesMap.has(token.line)) {
-        linesMap.set(token.line, []);
-      }
-      linesMap.get(token.line)!.push(token);
-    }
-
-    return linesMap;
+    chunks.push("</div>");
+    return chunks.join("");
   }
 
   private getCssClass(tokenType: string): string {

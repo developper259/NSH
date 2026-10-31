@@ -174,7 +174,7 @@ class PHPCode implements LanguageDefinition {
     "call_user_func_array",
   ];
 
-  public tokenTypes: TokenType[] = [
+  private readonly rootRules: TokenType[] = [
     createKeywordToken(this.phpKeywords),
     {
       name: "builtin",
@@ -245,10 +245,6 @@ class PHPCode implements LanguageDefinition {
     },
   ];
 
-  public getTokenTypes(): TokenType[] {
-    return this.tokenTypes;
-  }
-
   public getStates(): Record<string, TokenType[]> {
     return {
       root: [
@@ -258,7 +254,7 @@ class PHPCode implements LanguageDefinition {
           className: "nsh-comment",
           push: "inMultiLineComment",
         },
-        ...this.tokenTypes,
+        ...this.rootRules,
       ],
       inMultiLineComment: [
         { name: "comment", pattern: /\*\//g, className: "nsh-comment", pop: true },
@@ -307,8 +303,6 @@ class PHPCode implements LanguageDefinition {
     };
   }
 
-  comments = { singleLine: "//", multiLine: { start: "/*", end: "*/" } };
-  strings = { startEnd: ['"', "'"], escapeChar: "\\" };
 }
 
 const heredocPush: StatePushResolver = (
@@ -344,21 +338,6 @@ export class PHP implements LanguageDefinition {
 
   private html = new HTML();
   private phpCode = new PHPCode();
-
-  public tokenTypes: TokenType[] = [
-    {
-      name: "php-open",
-      pattern: /<\?(?:php\b|=|(?!xml\b))/gi,
-      className: "nsh-keyword",
-    },
-    { name: "php-close", pattern: /\?>/g, className: "nsh-keyword" },
-    ...this.phpCode.tokenTypes,
-    ...this.html.getTokenTypes(),
-  ];
-
-  public getTokenTypes(): TokenType[] {
-    return this.tokenTypes;
-  }
 
   public getStates(): Record<string, TokenType[]> {
     const phpStates = createEmbeddedStates({
@@ -398,6 +377,4 @@ export class PHP implements LanguageDefinition {
     };
   }
 
-  comments = { singleLine: "//", multiLine: { start: "/*", end: "*/" } };
-  strings = { startEnd: ['"', "'"], escapeChar: "\\" };
 }

@@ -1,12 +1,6 @@
 import { LanguageDefinition } from "../types/language";
 import { TokenType } from "../types/token";
-import {
-  createKeywordToken,
-  createStringToken,
-  createNumberToken,
-  STRING_PATTERNS,
-  NUMBER_PATTERNS,
-} from "./shared";
+import { createKeywordToken, createStringToken, STRING_PATTERNS } from "./shared";
 
 export class JSON implements LanguageDefinition {
   name = "json";
@@ -20,7 +14,7 @@ export class JSON implements LanguageDefinition {
 
   private jsonConstants = ["true", "false", "null"];
 
-  public tokenTypes: TokenType[] = [
+  private readonly rootRules: TokenType[] = [
     {
       name: "json-key",
       pattern: /"([^"\\]|\\.)*"(?=\s*:)/g,
@@ -45,15 +39,9 @@ export class JSON implements LanguageDefinition {
     },
   ];
 
-  public getTokenTypes(): TokenType[] {
-    return this.tokenTypes;
-  }
-
   public getStates(): Record<string, TokenType[]> {
     return {
-      root: this.tokenTypes,
+      root: this.rootRules,
     };
   }
-
-  strings = { startEnd: ['"'], escapeChar: "\\" };
 }

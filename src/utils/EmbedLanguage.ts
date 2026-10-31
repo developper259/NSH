@@ -12,10 +12,7 @@ export function createEmbeddedStates(
     skipExitStates = [],
   } = options;
 
-  const childStates =
-    typeof language.getStates === "function"
-      ? language.getStates()
-      : { root: language.getTokenTypes() };
+  const childStates = language.getStates();
 
   const embeddedStates: Record<string, TokenType[]> = {};
 
