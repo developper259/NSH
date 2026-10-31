@@ -20,7 +20,7 @@ test("npm pack + install in a temp project exposes CJS, ESM, types and themes", 
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "nsh-package-"));
   let tarball;
   try {
-    const packOutput = run("npm", ["pack", "--json"], ROOT);
+    const packOutput = run("npm", ["pack", "--json", "--ignore-scripts"], ROOT);
     const packInfo = JSON.parse(packOutput);
     tarball = path.join(ROOT, packInfo[0].filename);
     assert.ok(fs.existsSync(tarball), "tarball was not created");

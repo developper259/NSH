@@ -13,10 +13,13 @@ const cases = [
   ["javascript", new JavaScript(), 10000, "const value = 123.45;\n"],
   ["html", new HTML(), 1000, '<div class="item">text content</div>\n'],
   ["html-plain-text", new HTML(), 1, "x".repeat(20000)],
+  ["html-plain-text-large", new HTML(), 1, "text ".repeat(40000)],
   ["xml", new XML(), 1000, '<item id="1">text</item>\n'],
   ["css", new CSS(), 1000, ".item { width: 50%; color: #fff; }\n"],
+  ["css-unbalanced-braces", new CSS(), 4000, "{\n"],
   ["php", new PHP(), 1000, "<?php echo $value; ?>\n<div>html</div>\n"],
   ["whitespace", new JavaScript(), 1, " ".repeat(20000)],
+  ["whitespace-1m", new JavaScript(), 1, " ".repeat(1000000)],
 ];
 
 console.log("language\tsize\titerations\ttotal time\tms/iteration\ttokens");
@@ -48,6 +51,23 @@ for (const size of [10000, 50000, 100000]) {
     console.log(`incremental-${operation}\tlines=${size}\t${(performance.now() - start).toFixed(2)} ms\tretokenizedLines=${update.retokenizedLines}`);
   }
 }
+
+const highlightSource = Array.from(
+  { length: 10000 },
+  (_, index) => `const value${index} = ${index};`,
+).join("\n");
+const fullHighlighter = new Highlighter(new JavaScript());
+const highlightStart = performance.now();
+fullHighlighter.highlight(highlightSource);
+console.log(`highlight-html-10k\t${(performance.now() - highlightStart).toFixed(2)} ms`);
+
+const readableDocument = new IncrementalDocument(
+  new Tokenizer(new JavaScript()),
+  highlightSource,
+);
+const readStart = performance.now();
+readableDocument.getLines(0, readableDocument.getLineCount());
+console.log(`getLines-10k\t${(performance.now() - readStart).toFixed(2)} ms`);
 
 const highlighter = new Highlighter(new JavaScript());
 const socketLikeStart = performance.now();

@@ -342,6 +342,8 @@ List all registered languages:
 Highlighter.getSupportedLanguages();
 ```
 
+`LanguageRegistry` also resolves aliases (`js`, `ts`, `py`, `c++`, ...), indexes extensions for lookup, and supports removal.
+
 ---
 
 # Registering a custom language
@@ -448,6 +450,8 @@ context?: (
 ```
 
 This makes it possible to implement multiline constructs and lightweight context-sensitive highlighting without introducing a full parser.
+
+Language definitions are treated as immutable after a tokenizer compiles them. If a definition is mutated in place, call `tokenizer.setLanguage(language)` or `tokenizer.clearCache()` before tokenizing again.
 
 ---
 
@@ -666,6 +670,8 @@ The tokenizer:
 - uses sticky regular expressions;
 - caches compiled language states;
 - avoids forward regex scanning;
+- skips whitespace runs when no rule can consume them;
+- bounds lexical state depth to prevent pathological memory growth;
 - carries lexical state between lines.
 
 `IncrementalDocument` additionally stops re-tokenization once the lexical state converges with the cached document state.
@@ -730,16 +736,34 @@ Type-check:
 npm run typecheck
 ```
 
-Run the test suite:
+Run the test suite (includes packaging and browser-bundle checks):
 
 ```bash
 npm test
+```
+
+Run only the packaging checks:
+
+```bash
+npm run test:package
 ```
 
 Build:
 
 ```bash
 npm run build
+```
+
+Build the ESM wrappers from a clean tree:
+
+```bash
+npm run build:esm
+```
+
+Start a local WebSocket server:
+
+```bash
+NSH_TOKEN=secret NSH_PORT=0 npm start
 ```
 
 Run benchmarks:
@@ -784,8 +808,10 @@ That means some constructs which require complete syntactic or semantic knowledg
 
 Examples include:
 
-- ambiguous JavaScript regex literals versus division;
+- ambiguous JavaScript regex literals versus division, especially across line boundaries;
 - highly context-sensitive generic/type syntax;
+- CSV quoted fields spanning physical lines (tokens are line-based);
+- YAML block-scalar indentation beyond the supported heuristic;
 - complex nested language grammars;
 - advanced YAML indentation semantics.
 

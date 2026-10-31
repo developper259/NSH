@@ -34,8 +34,8 @@ for (const relPath of collectJsFiles(cjsDir)) {
   try {
     mod = require(cjsPath);
   } catch (error) {
-    console.warn(`Skipping ${relPath}: ${error.message}`);
-    continue;
+    console.error(`Failed to load ${relPath}: ${error.message}`);
+    process.exit(1);
   }
 
   const keys = Object.keys(mod).filter((k) => k !== "__esModule" && k !== "default");

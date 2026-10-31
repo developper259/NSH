@@ -37,14 +37,14 @@
     "build:cjs": "tsc -p tsconfig.cjs.json",
     "build:esm": "npm run build:cjs && node scripts/build-esm-wrapper.js",
     "typecheck": "tsc --noEmit",
-    "test": "npm run build && node --test test",
+    "test": "npm run build && node scripts/run-tests.js",
     "test:package": "npm run build && node test/package.test.js",
     "benchmark": "npm run build && node benchmark/index.js",
     "benchmark:smoke": "npm run build && node benchmark/smoke.js",
     "prepare": "node scripts/prepare.js",
     "dev": "tsc --watch",
     "start": "npm run build && node scripts/cli.js",
-    "socket": "npm run build && node test/index.js"
+    "socket": "npm run build && node scripts/socket-demo.js"
   },
   "dependencies": {
     "ws": "^8.21.1"

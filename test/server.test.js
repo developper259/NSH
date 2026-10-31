@@ -40,7 +40,7 @@ test("supports a manual port and rejects an occupied port", async () => {
   const port = owner.getPort();
   const manual = new NSHServer(port);
   try {
-    await assert.rejects(() => manual.start());
+    await assert.rejects(() => manual.start(), /EADDRINUSE|address already in use/i);
   } finally {
     await Promise.all([owner.stop(), manual.stop()]);
   }
@@ -69,8 +69,19 @@ function createClient(server) {
 
 function connect(server) {
   const ws = createClient(server);
-  return new Promise((resolve) => {
-    ws.on("open", () => resolve(ws));
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      ws.terminate();
+      reject(new Error("WebSocket connection timed out"));
+    }, 5000);
+    ws.once("open", () => {
+      clearTimeout(timer);
+      resolve(ws);
+    });
+    ws.once("error", (error) => {
+      clearTimeout(timer);
+      reject(error);
+    });
   });
 }
 
@@ -89,9 +100,10 @@ test("stop() resolves even when a client stays connected", async () => {
   const server = new NSHServer();
   await server.start();
   const client = await connect(server);
+  const closed = once(client, "close");
   await server.stop();
+  await closed;
   assert.equal(server.getPort(), null);
-  client.terminate();
 });
 
 test("real socket: highlight JavaScript", async () => {
@@ -557,6 +569,38 @@ test("document budgets and truncated update responses are enforced", async () =>
   }
 });
 
+test("server tokenizers honor the configured state depth", async () => {
+  const server = new NSHServer({ maxStateDepth: 8 });
+  try {
+    await server.start();
+    const client = await connect(server);
+    const code = Array.from({ length: 200 }, () => "{").join("\n");
+    assert.equal(
+      (await request(client, {
+        id: "open",
+        requestType: "openDocument",
+        documentId: "deep",
+        language: "css",
+        code,
+      })).success,
+      true,
+    );
+    const lines = await request(client, {
+      id: "read",
+      requestType: "getDocumentLines",
+      documentId: "deep",
+      startLine: 199,
+      endLine: 200,
+    });
+    assert.equal(lines.success, true);
+    assert.ok(lines.lines[0].stateAfter.length <= 8);
+    client.close();
+    await once(client, "close");
+  } finally {
+    await server.stop();
+  }
+});
+
 test("oversized frames are closed by the payload limit", async () => {
   const server = new NSHServer({ maxPayload: 1024 });
   try {
@@ -574,6 +618,59 @@ test("oversized frames are closed by the payload limit", async () => {
     );
     const [code] = await closed;
     assert.equal(code, 1009);
+  } finally {
+    await server.stop();
+  }
+});
+
+test("malformed JSON is rejected without closing the connection", async () => {
+  const server = new NSHServer();
+  try {
+    await server.start();
+    const client = await connect(server);
+    const response = await new Promise((resolve) => {
+      client.once("message", (data) => resolve(JSON.parse(data.toString())));
+      client.send("{not-json");
+    });
+    assert.equal(response.success, false);
+    assert.match(response.error, /Invalid JSON/);
+
+    const alive = await request(client, {
+      id: "alive",
+      requestType: "supportedLanguages",
+    });
+    assert.equal(alive.success, true);
+    client.close();
+    await once(client, "close");
+  } finally {
+    await server.stop();
+  }
+});
+
+test("documents stay isolated between connections", async () => {
+  const server = new NSHServer();
+  try {
+    await server.start();
+    const first = await connect(server);
+    const second = await connect(server);
+    await request(first, {
+      id: "open",
+      requestType: "openDocument",
+      documentId: "shared-id",
+      language: "javascript",
+      code: "const x = 1;",
+    });
+    const response = await request(second, {
+      id: "read",
+      requestType: "getDocumentLines",
+      documentId: "shared-id",
+      startLine: 0,
+      endLine: 1,
+    });
+    assert.equal(response.success, false);
+    first.close();
+    second.close();
+    await Promise.all([once(first, "close"), once(second, "close")]);
   } finally {
     await server.stop();
   }

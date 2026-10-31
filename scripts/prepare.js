@@ -1,4 +1,5 @@
 const { spawnSync } = require("node:child_process");
+const fs = require("node:fs");
 const path = require("node:path");
 
 let typescriptAvailable = true;
@@ -9,8 +10,15 @@ try {
 }
 
 if (!typescriptAvailable) {
-  console.warn("TypeScript is not installed; skipping the NSH build.");
-  process.exit(0);
+  const builtEntry = path.join(__dirname, "..", "dist", "cjs", "index.js");
+  if (fs.existsSync(builtEntry)) {
+    console.warn("TypeScript is not installed; using the existing dist build.");
+    process.exit(0);
+  }
+  console.error(
+    "TypeScript is required to build NSH from source. Install dev dependencies or use the published package.",
+  );
+  process.exit(1);
 }
 
 const root = path.join(__dirname, "..");

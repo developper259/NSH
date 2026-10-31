@@ -19,4 +19,22 @@ test("browser bundler can consume the public core entry point without Node serve
   const output = result.outputFiles[0].text;
   assert.ok(output.length > 0);
   assert.doesNotMatch(output, /node:fs|node:path|from\s*["']ws["']/);
+
+  const executable = await esbuild.build({
+    stdin: {
+      contents:
+        'import { Highlighter, JavaScript } from "nsh"; globalThis.__nshResult = new Highlighter(new JavaScript()).highlight("const value = 1;");',
+      resolveDir: process.cwd(),
+      sourcefile: "consumer.ts",
+      loader: "ts",
+    },
+    bundle: true,
+    write: false,
+    platform: "browser",
+    format: "iife",
+    target: "es2020",
+  });
+  new Function(executable.outputFiles[0].text)();
+  assert.match(globalThis.__nshResult.html, /nsh-keyword/);
+  delete globalThis.__nshResult;
 });
