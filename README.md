@@ -314,6 +314,7 @@ NSH currently includes the following built-in language definitions:
 | Java       | `.java`                                      |
 | C          | `.c`, `.h`                                   |
 | C++        | `.cpp`, `.cc`, `.cxx`, `.hpp`, `.hh`, `.hxx` |
+| CSV        | `.csv`                                       |
 
 > YAML support is currently experimental.
 

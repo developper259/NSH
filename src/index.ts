@@ -18,6 +18,7 @@ export { JSON } from './languages/JSON';
 export { Java } from './languages/Java';
 export { CPP } from './languages/CPP';
 export { C } from './languages/C';
+export { CSV } from './languages/CSV';
 
 export type { Token, TokenType } from './types/token';
 export type { CachedLineState, IncrementalUpdate } from './types/incremental';

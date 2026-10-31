@@ -12,6 +12,7 @@ import { XML } from './XML';
 import { CPP } from './CPP';
 import { LanguageRegistry } from '../core/LanguageRegistry';
 import { C } from './C';
+import { CSV } from './CSV';
 
 export const languages: Record<string, LanguageDefinition> = {
   javascript: new JavaScript(),
@@ -26,6 +27,7 @@ export const languages: Record<string, LanguageDefinition> = {
   xml: new XML(),
   cpp: new CPP(),
   c: new C(),
+  csv: new CSV(),
 };
 
 export const defaultRegistry = new LanguageRegistry();
