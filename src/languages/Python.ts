@@ -1,5 +1,5 @@
 import { LanguageDefinition } from "../types/language";
-import { TokenType } from "../types/token";
+import { Token, TokenType } from "../types/token";
 import {
   createKeywordToken,
   createFunctionToken,
@@ -140,23 +140,18 @@ export class Python implements LanguageDefinition {
     {
       name: "string",
       pattern:
-        /("""[\s\S]*?"""|'''[\s\S]*?'''|f"[^"]*"|f'[^']*'|r"[^"]*"|r'[^']*'|b"[^"]*"|b'[^']*'|"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')/g,
+        /(?:[rRbBuUfF]{1,2})"""[\s\S]*?"""|(?:[rRbBuUfF]{1,2})'''[\s\S]*?'''|f"[^"]*"|f'[^']*'|r"[^"]*"|r'[^']*'|b"[^"]*"|b'[^']*'|"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'/g,
       className: "nsh-string",
     },
-    {
-      name: "fstring-expression",
-      pattern: /\{[^}]*\}/g,
-      className: "nsh-variable",
-    },
     createNumberToken([
+      /\b\d+(?:\.\d+)?\+\d+(?:\.\d+)?[jJ]\b/g,
+      /\b\d+(?:\.\d+)?[jJ]\b/g,
       NUMBER_PATTERNS.hex,
       NUMBER_PATTERNS.binary,
       NUMBER_PATTERNS.octal,
       NUMBER_PATTERNS.scientific,
       NUMBER_PATTERNS.decimal,
       NUMBER_PATTERNS.integer,
-      /\b\d+j\b/g,
-      /\b\d+\+\d+j\b/g,
     ]),
     createCommentToken(COMMENT_PATTERNS.singleLine.hash),
     {
@@ -164,6 +159,7 @@ export class Python implements LanguageDefinition {
       pattern:
         /:\s*(?:[a-zA-Z_][a-zA-Z0-9_]*\s*(?:\[[^\]]*\])?\s*(?:\|\s*[a-zA-Z_][a-zA-Z0-9_]*\s*(?:\[[^\]]*\])?)*|list\[[^\]]*\]|dict\[[^\]]*\]|Callable\[[^\]]*\]|Optional\[[^\]]*\]|Tuple\[[^\]]*\]|Set\[[^\]]*\]|Any|None)(?=\s*(?:,|\)|=|:))/g,
       className: "nsh-keyword",
+      context: isTypeHintContext,
     },
     createFunctionToken(),
     {
@@ -176,16 +172,8 @@ export class Python implements LanguageDefinition {
       pattern: /(=|\+=|\-=|\*=|\/=|%=|\*\*=|\/\/=|&=|\|=|\^=|>>=|<<=)/g,
       className: "nsh-operator",
     },
-    { name: "identity", pattern: /(is|is not)/g, className: "nsh-operator" },
-    { name: "membership", pattern: /(in|not in)/g, className: "nsh-operator" },
-    { name: "boolean", pattern: /(and|or|not)/g, className: "nsh-operator" },
     { name: "walrus", pattern: /:=/g, className: "nsh-operator" },
     createVariableToken(),
-    {
-      name: "special-variable",
-      pattern: /\b(self|cls)\b/g,
-      className: "nsh-variable",
-    },
     { name: "bracket", pattern: /[\[\]\{\}\(\)]/g, className: "nsh-bracket" },
     {
       name: "operator",
@@ -214,6 +202,30 @@ export class Python implements LanguageDefinition {
         },
         {
           name: "string",
+          pattern: /(?:[fF][rR]?|[rR][fF])"""/g,
+          className: "nsh-string",
+          push: "inTripleDouble",
+        },
+        {
+          name: "string",
+          pattern: /(?:[fF][rR]?|[rR][fF])'''/g,
+          className: "nsh-string",
+          push: "inTripleSingle",
+        },
+        {
+          name: "string",
+          pattern: /(?:[rRbBuU]{1,2})"""/g,
+          className: "nsh-string",
+          push: "inTripleDouble",
+        },
+        {
+          name: "string",
+          pattern: /(?:[rRbBuU]{1,2})'''/g,
+          className: "nsh-string",
+          push: "inTripleSingle",
+        },
+        {
+          name: "string",
           pattern: /"""/g,
           className: "nsh-string",
           push: "inTripleDouble",
@@ -239,18 +251,18 @@ export class Python implements LanguageDefinition {
         {
           name: "string",
           pattern:
-            /(r"[^"]*"|r'[^']*'|b"[^"]*"|b'[^']*'|"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')/g,
+            /(?:[rRbBuU]{1,2})"(?:[^"\\]|\\.)*"|(?:[rRbBuU]{1,2})'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'/g,
           className: "nsh-string",
         },
         createNumberToken([
+          /\b\d+(?:\.\d+)?\+\d+(?:\.\d+)?[jJ]\b/g,
+          /\b\d+(?:\.\d+)?[jJ]\b/g,
           NUMBER_PATTERNS.hex,
           NUMBER_PATTERNS.binary,
           NUMBER_PATTERNS.octal,
           NUMBER_PATTERNS.scientific,
           NUMBER_PATTERNS.decimal,
           NUMBER_PATTERNS.integer,
-          /\b\d+j\b/g,
-          /\b\d+\+\d+j\b/g,
         ]),
         createCommentToken(COMMENT_PATTERNS.singleLine.hash),
         {
@@ -258,6 +270,7 @@ export class Python implements LanguageDefinition {
           pattern:
             /:\s*(?:[a-zA-Z_][a-zA-Z0-9_]*\s*(?:\[[^\]]*\])?\s*(?:\|\s*[a-zA-Z_][a-zA-Z0-9_]*\s*(?:\[[^\]]*\])?)*|list\[[^\]]*\]|dict\[[^\]]*\]|Callable\[[^\]]*\]|Optional\[[^\]]*\]|Tuple\[[^\]]*\]|Set\[[^\]]*\]|Any|None)(?=\s*(?:,|\)|=|:))/g,
           className: "nsh-keyword",
+          context: isTypeHintContext,
         },
         createFunctionToken(),
         {
@@ -270,28 +283,8 @@ export class Python implements LanguageDefinition {
           pattern: /(=|\+=|\-=|\*=|\/=|%=|\*\*=|\/\/=|&=|\|=|\^=|>>=|<<=)/g,
           className: "nsh-operator",
         },
-        {
-          name: "identity",
-          pattern: /(is|is not)/g,
-          className: "nsh-operator",
-        },
-        {
-          name: "membership",
-          pattern: /(in|not in)/g,
-          className: "nsh-operator",
-        },
-        {
-          name: "boolean",
-          pattern: /(and|or|not)/g,
-          className: "nsh-operator",
-        },
         { name: "walrus", pattern: /:=/g, className: "nsh-operator" },
         createVariableToken(),
-        {
-          name: "special-variable",
-          pattern: /\b(self|cls)\b/g,
-          className: "nsh-variable",
-        },
         {
           name: "bracket",
           pattern: /[\[\]\{\}\(\)]/g,
@@ -354,4 +347,26 @@ export class Python implements LanguageDefinition {
 
   comments = { singleLine: "#" };
   strings = { startEnd: ['"', "'", '"""', "'''"], escapeChar: "\\" };
+}
+
+function isTypeHintContext(
+  _line: string,
+  _position: number,
+  tokens: Token[],
+): boolean {
+  let variableIndex = tokens.length - 1;
+  while (variableIndex >= 0 && tokens[variableIndex].type === "comment") {
+    variableIndex -= 1;
+  }
+  if (variableIndex < 0 || tokens[variableIndex].type !== "variable") {
+    return false;
+  }
+
+  for (let index = variableIndex - 1; index >= 0; index -= 1) {
+    const token = tokens[index];
+    if (token.type === "comment") continue;
+    if (token.value === "{") return false;
+    if (token.value === "(" || token.value === "[") return true;
+  }
+  return true;
 }

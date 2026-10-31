@@ -321,6 +321,43 @@ test("Python triple strings are plain strings for the beta", () => {
     "no docstring type for beta",
   );
 });
+
+test("Python prefixed triple strings keep their state", () => {
+  for (const prefix of ["r", "b", "u", "fr", "rf"]) {
+    const code = `${prefix}"""line1\nline2"""\nx = 1`;
+    const result = new Tokenizer(new Python()).tokenizeWithState(code);
+    assert.deepEqual(result.finalStateStack, ["root"], prefix);
+    assert.ok(
+      result.tokens.some(
+        (token) => token.line === 3 && token.type === "variable" && token.value === "x",
+      ),
+      prefix,
+    );
+  }
+});
+
+test("Python type hints skip dictionary keys and keep real annotations", () => {
+  const dictionary = tokensFor(Python, '{"a": value, "b": 2}\n{x: value}');
+  assert.equal(
+    dictionary.filter((token) => token.type === "type-hint").length,
+    0,
+    "dictionary key was treated as a type hint",
+  );
+  const annotations = tokensFor(
+    Python,
+    "def f(a: int, b: str):\n    pass\nx: int = 1",
+  );
+  assert.ok(
+    annotations.some((token) => token.type === "type-hint" && token.value.includes("int")),
+    "parameter annotation missing",
+  );
+});
+
+test("Python complex numbers are single tokens", () => {
+  const tokens = tokensFor(Python, "x = 3+4j\ny = 1.5j\nz = 3 + 4j");
+  const numbers = tokens.filter((token) => token.type === "number").map((token) => token.value);
+  assert.deepEqual(numbers, ["3+4j", "1.5j", "3", "4j"]);
+});
 test("JavaScript prioritizes modern numbers, spread, and division", () => {
   const tokens = new Tokenizer(new JavaScript()).tokenize(
     "123.45 ...args a / b / c const r = /abc/g;",
