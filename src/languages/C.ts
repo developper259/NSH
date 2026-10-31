@@ -219,7 +219,8 @@ export class C implements LanguageDefinition {
         },
         {
           name: "operator",
-          pattern: /[+\-*/%=<>!&|^~?:;,.]/g,
+          pattern:
+            /(?:<<=|>>=|\+\+|--|&&|\|\||==|!=|<=|>=|<<|>>|->|\+=|-=|\*=|\/=|%=|&=|\|=|\^=|[+\-*/%=<>!&|^~?:;,.])/g,
           className: "nsh-operator",
         },
         createVariableToken(),

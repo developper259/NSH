@@ -823,6 +823,16 @@ test("C++ raw strings keep their delimiter state", () => {
   }
 });
 
+test("C-family multi-character operators stay atomic", () => {
+  const cpp = tokensFor(CPP, "if (a && b || c) {}");
+  assert.ok(cpp.some((token) => token.type === "operator" && token.value === "&&"));
+  assert.ok(cpp.some((token) => token.type === "operator" && token.value === "||"));
+  const c = tokensFor(C, "value->field = 1;");
+  assert.ok(c.some((token) => token.type === "operator" && token.value === "->"));
+  const java = tokensFor(Java, "value >>> 2;");
+  assert.ok(java.some((token) => token.type === "operator" && token.value === ">>>"));
+});
+
 test("C++ comparisons are not generic arguments", () => {
   const comparison = tokensFor(CPP, "if (a < b && c > d) { x(); }");
   assert.equal(
@@ -1060,6 +1070,16 @@ test("XML declarations and doctypes span their full context", () => {
   assert.ok(
     doctype.tokens.some(
       (token) => token.line === 4 && token.type === "tag-open" && token.value === "<root",
+    ),
+  );
+
+  const htmlDoctype = new Tokenizer(new HTML()).tokenizeWithState(
+    "<!DOCTYPE html\n>\n<div>x</div>",
+  );
+  assert.deepEqual(htmlDoctype.finalStateStack, ["root"]);
+  assert.ok(
+    htmlDoctype.tokens.some(
+      (token) => token.line === 3 && token.type === "tag-open" && token.value === "<div",
     ),
   );
 });

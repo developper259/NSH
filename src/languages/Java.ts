@@ -248,7 +248,8 @@ export class Java implements LanguageDefinition {
         },
         {
           name: "operator",
-          pattern: /[+\-*/%=<>!&|^~?:;,.]/g,
+          pattern:
+            /(?:>>>=|<<=|>>=|>>>|>>|<<|\+\+|--|&&|\|\||==|!=|<=|>=|\+=|-=|\*=|\/=|%=|&=|\|=|\^=|::|[+\-*/%=<>!&|^~?:;,.])/g,
           className: "nsh-operator",
         },
         {
