@@ -112,7 +112,7 @@ test("Markdown highlights headings, lists, inline markup, links, tables and HTML
     "",
     "---",
     "",
-    "```ts",
+    "```text",
     "const x: number = 1;",
     "# not a heading",
     "```",
@@ -135,7 +135,7 @@ test("Markdown highlights headings, lists, inline markup, links, tables and HTML
   assertToken(tokens, "- ", "list-marker");
   assertToken(tokens, "  - ", "list-marker");
   assertToken(tokens, "---", "separator");
-  assertToken(tokens, "```ts", "code-fence");
+  assertToken(tokens, "```text", "code-fence");
   assertToken(tokens, "const x: number = 1;", "code-block");
   assertToken(tokens, "# not a heading", "code-block");
   assertToken(tokens, "```", "code-fence-end");
@@ -157,9 +157,57 @@ test("Markdown code fences respect marker type and closing length", () => {
   const longerClose = tokenize(new Markdown(), ["```", "code", "````"].join("\n"));
   assert.equal(longerClose.filter((token) => token.type === "code-fence-end").length, 1);
 
-  const tildesFence = tokenize(new Markdown(), ["~~~js", "const x = 1;", "~~~"].join("\n"));
+  const tildesFence = tokenize(new Markdown(), ["~~~text", "const x = 1;", "~~~"].join("\n"));
   assert.equal(tildesFence.filter((token) => token.type === "code-block").length, 1);
   assert.equal(tildesFence.filter((token) => token.type === "code-fence-end").length, 1);
+});
+
+test("Markdown dispatches fenced code to embedded languages", () => {
+  const typescript = tokenize(
+    new Markdown(),
+    ["```ts", "const value: number = 1;", "```"].join("\n"),
+  );
+  assertToken(typescript, "const", "keyword");
+  assertToken(typescript, "number", "type");
+  assertToken(typescript, "```", "code-fence-end");
+
+  const javascript = tokenize(
+    new Markdown(),
+    ["```js", "const re = /[a-z]+/g;", "```"].join("\n"),
+  );
+  assert.ok(javascript.some((token) => token.type === "regex"));
+
+  const python = tokenize(
+    new Markdown(),
+    ["```python", "def f(a: int):", "    return a", "```"].join("\n"),
+  );
+  assertToken(python, "def", "keyword");
+  assert.ok(python.some((token) => token.type === "type-hint"));
+
+  const html = tokenize(
+    new Markdown(),
+    ["```html", '<div class="a">text</div>', "```"].join("\n"),
+  );
+  assertToken(html, "<div", "tag-open");
+
+  const plain = tokenize(
+    new Markdown(),
+    ["```text", "plain content", "```"].join("\n"),
+  );
+  assertToken(plain, "plain content", "code-block");
+});
+
+test("embedded fences close even from an open language state", () => {
+  const cases = [
+    ["```js", "/* open comment", "```"],
+    ["```bash", 'echo "unterminated', "```"],
+    ["```rust", 'let value = r#"raw', "```"],
+    ["```html", "<script>", "```"],
+  ];
+  for (const lines of cases) {
+    const tokens = tokenize(new Markdown(), lines.join("\n"));
+    assertToken(tokens, "```", "code-fence-end");
+  }
 });
 
 test("Markdown keeps an open code fence state until a valid close", () => {

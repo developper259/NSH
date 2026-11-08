@@ -357,7 +357,12 @@ NSH currently includes the following built-in language definitions:
 | C          | `.c`, `.h`                                   |
 | C++        | `.cpp`, `.cc`, `.cxx`, `.hpp`, `.hh`, `.hxx` |
 | CSV        | `.csv`                                       |
-| Markdown   | `.md`, `.markdown`                          |
+| Markdown   | `.md`, `.markdown`                           |
+| Bash       | `.sh`, `.bash`, `.zsh`                       |
+| SQL        | `.sql`                                       |
+| Rust       | `.rs`                                        |
+| Go         | `.go`                                        |
+| SCSS       | `.scss`                                      |
 
 > YAML support is currently experimental.
 
@@ -367,11 +372,13 @@ some TSX cases (notably generic arrow functions with constraints); NSH uses
 heuristics and documents the remaining limits below.
 
 Markdown supports headings, lists, blockquotes, separators, inline markup, links,
-images, tables, embedded HTML and fenced code blocks. Fenced code content is
-highlighted as a code block; it is not dispatched to the language named in the
-fence info string.
+images, tables, embedded HTML and fenced code blocks. Fenced code with a recognized
+info string is dispatched to an embedded language definition. Supported fence names
+include `js`, `ts`, `jsx`, `tsx`, `py`, `html`, `css`, `json`, `yaml`, `sh`, `sql`,
+`rust`, `go` and `scss`; aliases such as `javascript`, `python`, `bash` and `rs`
+also work. Unknown info strings fall back to plain code-block highlighting.
 
-SCSS/Sass are not currently supported.
+SCSS is supported. The indented Sass syntax (`.sass`) is not.
 
 ---
 
@@ -560,6 +567,13 @@ Validation can be disabled for legacy definitions:
 
 ```ts
 new Tokenizer(language, { validate: false });
+```
+
+Rules are filtered by their provable first characters by default. Disable that
+filter only when debugging a custom pattern whose first atom is unusual:
+
+```ts
+new Tokenizer(language, { firstCharacterFilter: false });
 ```
 
 Language definitions are treated as immutable after a tokenizer compiles them. If a definition is mutated in place, call `tokenizer.setLanguage(language)` or `tokenizer.clearCache()` before tokenizing again.
@@ -784,6 +798,7 @@ The tokenizer:
 - caches compiled and validated language states;
 - avoids forward regex scanning;
 - runs context callbacks only after a cheap first-character guard;
+- skips rules whose ASCII first character is provably impossible at the current position;
 - bounds contextual lookahead (see the limits above);
 - skips whitespace runs when no rule can consume them;
 - bounds lexical state depth to prevent pathological memory growth;
@@ -794,11 +809,17 @@ converges with the cached document state. Convergence is skipped when absolute
 line indexes shift for a line-index-sensitive language, so cached tokens are never
 reused across an unsafe index change.
 
-Rules are still tested in declaration order at each position. NSH did not add a
-first-character rule index: the benchmark suite shows contextual checks and token
-allocation dominating realistic workloads, and an index would risk changing rule
-priority semantics. Rules should therefore be ordered from most specific to most
-general.
+Rule priority is unchanged: rules are still evaluated in declaration order. Rules
+whose first consuming atom is a literal, an ASCII character class or a simple
+escape are skipped when the current character cannot start them. The derivation is
+conservative: groups, top-level alternations, optional leading atoms, Unicode
+classes and case-insensitive patterns are always tested. Interleaved measurements
+on 10,000-line documents showed roughly 6–50% tokenizer improvement depending on
+language and line shape, with larger gains on long single lines. Rules should still
+be ordered from most specific to most general.
+
+`TokenizerOptions.firstCharacterFilter` disables this optimization for debugging
+custom rules; it should not be needed in normal use.
 
 Run the benchmark suite with:
 
@@ -825,59 +846,64 @@ Initial tokenization:
 
 | Language   | Lines  | Chars    | Tokens   | Median ms | p95 ms |
 | ---------- | ------ | -------- | -------- | --------- | ------ |
-| JavaScript | 1,000  | 25,749   | 7,250    | 28.67     | 86.59  |
-| JavaScript | 10,000 | 257,499  | 72,500   | 115.68    | 170.32 |
-| JavaScript | 50,000 | 1,287,499| 362,500  | 533.69    | 646.06 |
-| JavaScript | 100,000| 2,574,999| 725,000  | 1,026.28  | 1,411.70 |
-| TypeScript | 10,000 | 417,499  | 127,500  | 503.98    | 1,125.33 |
-| TypeScript | 100,000| 4,174,999| 1,275,000| 3,332.42  | 3,409.10 |
-| Python     | 10,000 | 174,999  | 60,000   | 156.22    | 160.64 |
-| HTML       | 10,000 | 279,999  | 75,000   | 88.39     | 93.07  |
-| CSS        | 10,000 | 349,999  | 110,000  | 328.90    | 737.40 |
-| JSON       | 10,000 | 429,999  | 130,000  | 120.65    | 126.59 |
-| Markdown   | 10,000 | 147,499  | 17,500   | 101.93    | 124.31 |
+| JavaScript | 1,000  | 25,749   | 7,250    | 15.72     | 25.35  |
+| JavaScript | 10,000 | 257,499  | 72,500   | 156.76    | 302.48 |
+| JavaScript | 50,000 | 1,287,499| 362,500  | 847.96    | 1,116.89 |
+| JavaScript | 100,000| 2,574,999| 725,000  | 1,982.93  | 2,503.09 |
+| TypeScript | 10,000 | 417,499  | 127,500  | 530.38    | 1,481.48 |
+| TypeScript | 100,000| 4,174,999| 1,275,000| 5,462.29  | 5,817.23 |
+| Python     | 10,000 | 174,999  | 60,000   | 535.83    | 540.94 |
+| HTML       | 10,000 | 279,999  | 75,000   | 144.34    | 147.57 |
+| CSS        | 10,000 | 349,999  | 110,000  | 377.42    | 673.23 |
+| JSON       | 10,000 | 429,999  | 130,000  | 240.16    | 280.44 |
+| Markdown   | 10,000 | 147,499  | 17,500   | 136.19    | 163.43 |
+| Bash       | 10,000 | 165,999  | 48,000   | 109.29    | 128.83 |
+| SQL        | 10,000 | 223,338  | 56,668   | 149.34    | 159.59 |
+| Rust       | 10,000 | 142,499  | 52,500   | 145.20    | 146.78 |
+| Go         | 10,000 | 109,999  | 28,000   | 134.41    | 158.79 |
+| SCSS       | 10,000 | 141,999  | 40,000   | 113.01    | 142.82 |
 
 Incremental updates on 100,000-line documents:
 
 | Language   | Edit          | Retokenized lines | Median ms | p95 ms |
 | ---------- | ------------- | ----------------- | --------- | ------ |
-| JavaScript | middle        | 2                 | 1.18      | 1.62   |
-| JavaScript | insert start  | 2                 | 0.95      | 1.43   |
-| JavaScript | insert end    | 1                 | 0.97      | 1.84   |
-| JavaScript | delete start  | 1                 | 0.92      | 0.93   |
-| JavaScript | multiline     | 50,000            | 78.98     | 90.10  |
-| TypeScript | middle        | 2                 | 0.87      | 1.38   |
-| TypeScript | insert start  | 2                 | 0.96      | 1.00   |
-| TypeScript | insert end    | 1                 | 0.94      | 0.95   |
-| TypeScript | delete start  | 1                 | 0.96      | 0.98   |
-| TypeScript | multiline     | 50,000            | 78.89     | 391.74 |
+| JavaScript | middle        | 2                 | 1.21      | 1.61   |
+| JavaScript | insert start  | 2                 | 1.39      | 3.88   |
+| JavaScript | insert end    | 1                 | 1.10      | 1.46   |
+| JavaScript | delete start  | 1                 | 1.44      | 4.74   |
+| JavaScript | multiline     | 50,000            | 110.05    | 261.96 |
+| TypeScript | middle        | 2                 | 1.02      | 3.71   |
+| TypeScript | insert start  | 2                 | 5.17      | 5.77   |
+| TypeScript | insert end    | 1                 | 2.06      | 2.89   |
+| TypeScript | delete start  | 1                 | 1.15      | 1.26   |
+| TypeScript | multiline     | 50,000            | 88.57     | 118.96 |
 
 Reads, HTML and long lines:
 
 | Metric                    | Size                | Median ms | p95 ms |
 | ------------------------- | ------------------- | --------- | ------ |
-| `getLine`                 | 100,000 lines       | 0.02      | 0.02   |
-| `getLines(100)`           | 100,000 lines       | 0.13      | 0.29   |
-| `getTokensForLines(100)`  | 100,000 lines       | 0.09      | 0.13   |
-| `getTokens()`             | 100,000 lines       | 137.53    | 148.55 |
-| `getHTML()`               | 10,000 lines        | 332.88    | 545.34 |
-| `highlight()`             | 10,000 lines        | 217.33    | 218.56 |
-| `getHTML()`               | 100,000 lines       | 2,668.82  | 3,591.79 |
-| TypeScript colons         | 120,000 characters  | 126.45    | 133.96 |
-| TypeScript generics       | 272,000 characters  | 124.95    | 131.29 |
-| Python annotations        | 96,000 characters   | 109.58    | 225.91 |
-| C++ angle brackets        | 105,000 characters  | 434.63    | 738.24 |
-| JavaScript symbols        | 500,000 characters  | 566.36    | 621.42 |
-| Minified JSON             | 500,000 characters  | 447.78    | 477.10 |
-| HTML text                 | 500,000 characters  | 0.51      | 0.54   |
+| `getLine`                 | 100,000 lines       | 0.02      | 0.17   |
+| `getLines(100)`           | 100,000 lines       | 0.13      | 0.15   |
+| `getTokensForLines(100)`  | 100,000 lines       | 0.18      | 0.53   |
+| `getTokens()`             | 100,000 lines       | 183.25    | 276.06 |
+| `getHTML()`               | 10,000 lines        | 250.83    | 289.68 |
+| `highlight()`             | 10,000 lines        | 444.52    | 454.71 |
+| `getHTML()`               | 100,000 lines       | 3,271.07  | 3,339.02 |
+| TypeScript colons         | 120,000 characters  | 131.78    | 135.21 |
+| TypeScript generics       | 272,000 characters  | 166.62    | 233.23 |
+| Python annotations        | 96,000 characters   | 140.69    | 162.24 |
+| C++ angle brackets        | 105,000 characters  | 190.47    | 204.79 |
+| JavaScript symbols        | 500,000 characters  | 451.01    | 538.35 |
+| Minified JSON             | 500,000 characters  | 567.95    | 865.00 |
+| HTML text                 | 500,000 characters  | 0.86      | 0.99   |
 
 Document construction memory (JavaScript):
 
 | Lines   | Chars     | Tokens  | Heap delta | Bytes/char |
 | ------- | --------- | ------- | ---------- | ---------- |
-| 10,000  | 257,499   | 72,500  | 8.15 MiB   | 33.18      |
+| 10,000  | 257,499   | 72,500  | 8.16 MiB   | 33.22      |
 | 50,000  | 1,287,499 | 362,500 | 31.95 MiB  | 26.02      |
-| 100,000 | 2,574,999 | 725,000 | 39.08 MiB  | 15.92      |
+| 100,000 | 2,574,999 | 725,000 | 39.09 MiB  | 15.92      |
 
 ## Memory retention
 
@@ -972,8 +998,9 @@ npm test
 
 The suite covers tokenizer rules and validation, seeded differential tests that
 compare incremental tokenization against a full retokenization across languages,
-long-line regressions, Highlighter escaping/text preservation, the registry,
-the WebSocket server, browser bundling and npm packaging.
+first-character-filter equivalence tests, long-line regressions, Highlighter
+escaping/text preservation, the registry, the WebSocket server, browser bundling
+and npm packaging.
 
 Run only the packaging checks:
 
@@ -1030,6 +1057,24 @@ npm run benchmark:smoke
 The smoke test checks correctness and reports timings without imposing fixed
 performance thresholds.
 
+Run the real-corpus benchmark:
+
+```bash
+npm run benchmark:corpus
+# NSH_CORPUS_SAMPLES=5 by default; the npm script enables --expose-gc
+```
+
+It tokenizes the repository's source, tests, README, theme files and the
+`benchmark/corpus` fixtures, and compares each file against
+`benchmark/corpus-baseline.json`. Token-count ratios expose structural
+regressions deterministically; timing ratios are informational and depend on the
+machine. CI runs it as a **non-blocking** step: ratios are reported but never fail
+the build. Refresh the baseline explicitly on a representative machine:
+
+```bash
+npm run benchmark:corpus:update
+```
+
 Inspect the npm package before publishing:
 
 ```bash
@@ -1066,11 +1111,14 @@ Examples include:
 - YAML block-scalar indentation beyond the supported heuristic;
 - complex nested language grammars;
 - advanced YAML indentation semantics;
-- TypeScript class-field annotations and some deeply nested type constructs;
+- some deeply nested TypeScript type constructs;
 - JSX/TSX angle-bracket ambiguity between generics, type parameters and tags;
-- Markdown fenced code that is not re-tokenized with the language named in its info string;
 - Markdown headings, blockquotes and table headers are line-level constructs rather than nested inline parses;
-- JSX closing tags must terminate on the same physical line.
+- Markdown blockquoted or list-indented fences are not opened as fences;
+- JSX closing tags must terminate on the same physical line;
+- Bash/SCSS/SQL/Rust/Go support is lexical and intentionally does not attempt full language validation;
+- Rust block comments are not nested;
+- SQL dialects and Bash grammar variants are approximated.
 
 Long-line guards are intentionally bounded rather than unlimited:
 

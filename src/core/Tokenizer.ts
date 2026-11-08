@@ -12,6 +12,7 @@ import {
   resolveBaseStateName,
   validateStates,
 } from "./LanguageValidation";
+import { deriveFirstCharacters } from "./FirstCharFilter";
 
 const DEFAULT_MAX_STATE_DEPTH = 64;
 const DEFAULT_STATE = ["root"];
@@ -37,6 +38,7 @@ export class Tokenizer {
   private validationWarnings: string[] = [];
   private readonly maxStateDepth: number;
   private readonly validationEnabled: boolean;
+  private readonly firstCharacterFilter: boolean;
 
   constructor(language: LanguageDefinition, options: TokenizerOptions = {}) {
     const maxStateDepth = options.maxStateDepth ?? DEFAULT_MAX_STATE_DEPTH;
@@ -46,6 +48,7 @@ export class Tokenizer {
     this.language = language;
     this.maxStateDepth = maxStateDepth;
     this.validationEnabled = options.validate ?? true;
+    this.firstCharacterFilter = options.firstCharacterFilter ?? true;
   }
 
   public getMaxStateDepth(): number {
@@ -111,6 +114,11 @@ export class Tokenizer {
       let matched = false;
 
       for (const rule of compiledState.rules) {
+        if (rule.firstChars) {
+          const code = line.charCodeAt(position);
+          if (code >= 128 || rule.firstChars[code] === 0) continue;
+        }
+
         if (
           rule.original.context &&
           !rule.original.context(line, position, tokens, stateStack, lineIndex)
@@ -309,7 +317,13 @@ export class Tokenizer {
             `state "${stateName}" rule ${ruleIndex} has an invalid pattern: ${message}`,
           ]);
         }
-        return { original, matcher };
+        return {
+          original,
+          matcher,
+          firstChars: this.firstCharacterFilter
+            ? deriveFirstCharacters(original.pattern) ?? undefined
+            : undefined,
+        };
       });
       compiledStates[stateName] = {
         rules: compiledRules,

@@ -1,12 +1,9 @@
 import { LanguageDefinition } from "./language";
+import { TokenType } from "./token";
 
 export interface EmbeddedLanguageOptions {
   language: LanguageDefinition;
-  exitRule: {
-    name: string;
-    pattern: RegExp;
-    className: string;
-  };
+  exitRule: Pick<TokenType, "name" | "pattern" | "className" | "context">;
   prefix: string;
   /** Return to the exact parent state instead of leaving the host language. */
   exitMode?: "host" | "parent";

@@ -12,6 +12,11 @@ const { Markdown } = require("../dist/cjs/languages/Markdown");
 const { CSV } = require("../dist/cjs/languages/CSV");
 const { JSX } = require("../dist/cjs/languages/JSX");
 const { TSX } = require("../dist/cjs/languages/TSX");
+const { Bash } = require("../dist/cjs/languages/Bash");
+const { SQL } = require("../dist/cjs/languages/SQL");
+const { Rust } = require("../dist/cjs/languages/Rust");
+const { Go } = require("../dist/cjs/languages/Go");
+const { SCSS } = require("../dist/cjs/languages/SCSS");
 
 const SCENARIOS = [
   {
@@ -162,6 +167,87 @@ const SCENARIOS = [
       '  <div className="app">{title as string}</div>',
       ");",
       "const f = <T,>(value: T) => value;",
+      "",
+    ],
+  },
+  {
+    name: "Bash",
+    language: new Bash(),
+    seed: 0xb4c5d6,
+    snippets: [
+      "#!/usr/bin/env bash",
+      'name="world"',
+      'echo "hello $name"',
+      "if [[ -n \"$name\" ]]; then",
+      "fi",
+      "cat <<EOF",
+      "content",
+      "EOF",
+      "# comment",
+      "",
+    ],
+  },
+  {
+    name: "SQL",
+    language: new SQL(),
+    seed: 0xc5d6e7,
+    snippets: [
+      "SELECT id, name FROM users",
+      "WHERE active = true",
+      "  AND name = 'O''Brien'",
+      "ORDER BY id DESC;",
+      "-- comment",
+      "/*",
+      "comment",
+      "*/",
+      "",
+    ],
+  },
+  {
+    name: "Rust",
+    language: new Rust(),
+    seed: 0xd6e7f8,
+    snippets: [
+      "fn main<'a>(value: &'a str) -> Result<(), Error> {",
+      '  let raw = r#"content"#;',
+      "  let ch = 'x';",
+      "  Ok(())",
+      "}",
+      "/*",
+      "comment",
+      "*/",
+      "",
+    ],
+  },
+  {
+    name: "Go",
+    language: new Go(),
+    seed: 0xe7f809,
+    snippets: [
+      "package main",
+      "func main() {",
+      "  value := `raw",
+      "string`",
+      "  _ = value",
+      "}",
+      "// comment",
+      "",
+    ],
+  },
+  {
+    name: "SCSS",
+    language: new SCSS(),
+    seed: 0xf8091a,
+    snippets: [
+      "$primary: red;",
+      "@mixin box($size: 10px) {",
+      "  width: $size;",
+      "}",
+      ".card {",
+      "  @include box(20px);",
+      "  &:hover { color: $primary; }",
+      "}",
+      "// comment",
       "",
     ],
   },

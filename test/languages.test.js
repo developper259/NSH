@@ -9,6 +9,11 @@ const { TypeScript } = require("../dist/cjs/languages/TypeScript");
 const { JSX } = require("../dist/cjs/languages/JSX");
 const { TSX } = require("../dist/cjs/languages/TSX");
 const { Markdown } = require("../dist/cjs/languages/Markdown");
+const { Bash } = require("../dist/cjs/languages/Bash");
+const { SQL } = require("../dist/cjs/languages/SQL");
+const { Rust } = require("../dist/cjs/languages/Rust");
+const { Go } = require("../dist/cjs/languages/Go");
+const { SCSS } = require("../dist/cjs/languages/SCSS");
 const { Python } = require("../dist/cjs/languages/Python");
 const { HTML } = require("../dist/cjs/languages/HTML");
 const { CSS } = require("../dist/cjs/languages/CSS");
@@ -41,6 +46,11 @@ test("smoke: every registered language produces tokens on a simple example", () 
     ["JSX", JSX, "const x = <div className=\"a\">text</div>;"],
     ["TSX", TSX, "const x = <div>{value as string}</div>;"],
     ["Markdown", Markdown, "# Title\n\n**bold** and `code`"],
+    ["Bash", Bash, 'echo "hello"'],
+    ["SQL", SQL, "SELECT * FROM users;"],
+    ["Rust", Rust, "fn main() { println!(\"hi\"); }"],
+    ["Go", Go, "package main\nfunc main() {}"],
+    ["SCSS", SCSS, "$color: red;\n.a { color: $color; }"],
     ["Python", Python, "def f():\n    return 1"],
     ["HTML", HTML, '<div class="a">hi</div>'],
     ["CSS", CSS, "body { color: red; }"],
@@ -561,6 +571,51 @@ test("TypeScript interface properties remain properties", () => {
   const tokens = tokensFor(TypeScript, "interface User { name: string; age?: number; metadata: Record<string, unknown>; }");
   for (const value of ["name", "age", "metadata"])
     assert.equal(tokens.find((token) => token.value === value).type, "property");
+});
+
+test("TypeScript class fields and method bodies keep their lexical state", () => {
+  const code = [
+    "class User<T> extends Base {",
+    "  name: string;",
+    "  age?: number;",
+    "  static count: number = 0;",
+    "  value: Array<Map<string, T>>;",
+    "  constructor(private id: string) {}",
+    "  getName(): string {",
+    "    const local: number = 1;",
+    "    return this.name;",
+    "  }",
+    "}",
+    "const after = 1;",
+  ].join("\n");
+  const result = new Tokenizer(new TypeScript()).tokenizeWithState(code);
+  const first = (value) => result.tokens.find((token) => token.value === value);
+
+  assert.deepEqual(result.finalStateStack, ["root"]);
+  for (const value of ["string", "number", "T"]) {
+    assert.equal(first(value).type, "type", value);
+  }
+  for (const value of ["name", "age", "count", "value", "id"]) {
+    assert.ok(
+      ["variable", "property"].includes(first(value).type),
+      `${value} leaked into ${first(value).type}`,
+    );
+  }
+  assert.equal(first("getName").type, "function");
+  assert.equal(first("local").type, "variable");
+  assert.equal(first("after").type, "variable");
+});
+
+test("TypeScript object initializers inside class bodies stay value contexts", () => {
+  const code = "class A { handler = () => { const value = { name: 1 }; return value.name; }; }";
+  const result = new Tokenizer(new TypeScript()).tokenizeWithState(code);
+  assert.deepEqual(result.finalStateStack, ["root"]);
+  const colon = result.tokens.find((token) => token.value === "name" && token.column > 1);
+  assert.equal(colon.type, "variable");
+  assert.equal(
+    result.tokens.some((token) => token.value === ":" && token.type === "type-separator"),
+    false,
+  );
 });
 
 test("TypeScript type alias state does not leak", () => {

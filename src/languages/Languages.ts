@@ -16,6 +16,11 @@ import { LanguageRegistry } from '../core/LanguageRegistry';
 import { C } from './C';
 import { CSV } from './CSV';
 import { Markdown } from './Markdown';
+import { Bash } from './Bash';
+import { SQL } from './SQL';
+import { Rust } from './Rust';
+import { Go } from './Go';
+import { SCSS } from './SCSS';
 
 export const languages: Record<string, LanguageDefinition> = {
   javascript: new JavaScript(),
@@ -34,6 +39,11 @@ export const languages: Record<string, LanguageDefinition> = {
   c: new C(),
   csv: new CSV(),
   markdown: new Markdown(),
+  bash: new Bash(),
+  sql: new SQL(),
+  rust: new Rust(),
+  go: new Go(),
+  scss: new SCSS(),
 };
 
 export const defaultRegistry = new LanguageRegistry();

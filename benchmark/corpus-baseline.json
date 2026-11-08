@@ -1,0 +1,576 @@
+{
+  "generatedAt": "2026-11-08T13:44:38.094Z",
+  "node": "v22.12.0",
+  "platform": "darwin",
+  "arch": "x64",
+  "samples": 5,
+  "total": {
+    "files": 80,
+    "chars": 406471,
+    "lines": 14676,
+    "tokens": 71886,
+    "medianMs": 176.13
+  },
+  "files": {
+    "README.md": {
+      "language": "markdown",
+      "lines": 1175,
+      "chars": 32244,
+      "tokens": 2014,
+      "medianMs": 17.58
+    },
+    "benchmark/corpus/sample.go": {
+      "language": "go",
+      "lines": 18,
+      "chars": 255,
+      "tokens": 73,
+      "medianMs": 0.33
+    },
+    "benchmark/corpus/sample.html": {
+      "language": "html",
+      "lines": 18,
+      "chars": 346,
+      "tokens": 87,
+      "medianMs": 0.45
+    },
+    "benchmark/corpus/sample.json": {
+      "language": "json",
+      "lines": 11,
+      "chars": 154,
+      "tokens": 39,
+      "medianMs": 0.19
+    },
+    "benchmark/corpus/sample.jsx": {
+      "language": "jsx",
+      "lines": 15,
+      "chars": 256,
+      "tokens": 77,
+      "medianMs": 0.47
+    },
+    "benchmark/corpus/sample.py": {
+      "language": "python",
+      "lines": 17,
+      "chars": 242,
+      "tokens": 48,
+      "medianMs": 0.29
+    },
+    "benchmark/corpus/sample.rs": {
+      "language": "rust",
+      "lines": 22,
+      "chars": 453,
+      "tokens": 134,
+      "medianMs": 1.46
+    },
+    "benchmark/corpus/sample.scss": {
+      "language": "scss",
+      "lines": 19,
+      "chars": 207,
+      "tokens": 51,
+      "medianMs": 0.28
+    },
+    "benchmark/corpus/sample.sh": {
+      "language": "bash",
+      "lines": 16,
+      "chars": 180,
+      "tokens": 47,
+      "medianMs": 0.26
+    },
+    "benchmark/corpus/sample.sql": {
+      "language": "sql",
+      "lines": 17,
+      "chars": 319,
+      "tokens": 73,
+      "medianMs": 0.2
+    },
+    "benchmark/corpus/sample.tsx": {
+      "language": "tsx",
+      "lines": 18,
+      "chars": 320,
+      "tokens": 90,
+      "medianMs": 0.34
+    },
+    "scripts/build-esm-wrapper.js": {
+      "language": "javascript",
+      "lines": 52,
+      "chars": 1620,
+      "tokens": 457,
+      "medianMs": 0.89
+    },
+    "scripts/clean.js": {
+      "language": "javascript",
+      "lines": 10,
+      "chars": 272,
+      "tokens": 72,
+      "medianMs": 0.17
+    },
+    "scripts/cli.js": {
+      "language": "javascript",
+      "lines": 31,
+      "chars": 765,
+      "tokens": 193,
+      "medianMs": 0.46
+    },
+    "scripts/copy-themes.js": {
+      "language": "javascript",
+      "lines": 11,
+      "chars": 393,
+      "tokens": 107,
+      "medianMs": 0.23
+    },
+    "scripts/prepare.js": {
+      "language": "javascript",
+      "lines": 32,
+      "chars": 898,
+      "tokens": 182,
+      "medianMs": 0.45
+    },
+    "scripts/run-tests.js": {
+      "language": "javascript",
+      "lines": 22,
+      "chars": 546,
+      "tokens": 152,
+      "medianMs": 0.24
+    },
+    "scripts/socket-demo.js": {
+      "language": "javascript",
+      "lines": 23,
+      "chars": 489,
+      "tokens": 114,
+      "medianMs": 0.25
+    },
+    "src/core/FirstCharFilter.ts": {
+      "language": "typescript",
+      "lines": 302,
+      "chars": 7729,
+      "tokens": 1732,
+      "medianMs": 5.05
+    },
+    "src/core/Highlighter.ts": {
+      "language": "typescript",
+      "lines": 246,
+      "chars": 8641,
+      "tokens": 1585,
+      "medianMs": 3.88
+    },
+    "src/core/IncrementalDocument.ts": {
+      "language": "typescript",
+      "lines": 256,
+      "chars": 7938,
+      "tokens": 1597,
+      "medianMs": 3.98
+    },
+    "src/core/LanguageRegistry.ts": {
+      "language": "typescript",
+      "lines": 77,
+      "chars": 2728,
+      "tokens": 582,
+      "medianMs": 1.38
+    },
+    "src/core/LanguageValidation.ts": {
+      "language": "typescript",
+      "lines": 314,
+      "chars": 9441,
+      "tokens": 1918,
+      "medianMs": 4.2
+    },
+    "src/core/Parser.ts": {
+      "language": "typescript",
+      "lines": 42,
+      "chars": 1160,
+      "tokens": 243,
+      "medianMs": 1.05
+    },
+    "src/core/Socket.ts": {
+      "language": "typescript",
+      "lines": 1021,
+      "chars": 32561,
+      "tokens": 6028,
+      "medianMs": 15.06
+    },
+    "src/core/Tokenizer.ts": {
+      "language": "typescript",
+      "lines": 501,
+      "chars": 15559,
+      "tokens": 3038,
+      "medianMs": 8.24
+    },
+    "src/index.ts": {
+      "language": "typescript",
+      "lines": 49,
+      "chars": 1969,
+      "tokens": 283,
+      "medianMs": 0.57
+    },
+    "src/languages/Bash.ts": {
+      "language": "typescript",
+      "lines": 227,
+      "chars": 4670,
+      "tokens": 747,
+      "medianMs": 2.98
+    },
+    "src/languages/C.ts": {
+      "language": "typescript",
+      "lines": 256,
+      "chars": 5271,
+      "tokens": 771,
+      "medianMs": 3.1
+    },
+    "src/languages/CPP.ts": {
+      "language": "typescript",
+      "lines": 426,
+      "chars": 9305,
+      "tokens": 1496,
+      "medianMs": 5.03
+    },
+    "src/languages/CSS.ts": {
+      "language": "typescript",
+      "lines": 293,
+      "chars": 6069,
+      "tokens": 857,
+      "medianMs": 2.51
+    },
+    "src/languages/CSV.ts": {
+      "language": "typescript",
+      "lines": 50,
+      "chars": 1470,
+      "tokens": 220,
+      "medianMs": 0.65
+    },
+    "src/languages/Go.ts": {
+      "language": "typescript",
+      "lines": 199,
+      "chars": 3877,
+      "tokens": 579,
+      "medianMs": 1.66
+    },
+    "src/languages/HTML.ts": {
+      "language": "typescript",
+      "lines": 313,
+      "chars": 7238,
+      "tokens": 999,
+      "medianMs": 3.5
+    },
+    "src/languages/JSON.ts": {
+      "language": "typescript",
+      "lines": 47,
+      "chars": 1099,
+      "tokens": 174,
+      "medianMs": 0.58
+    },
+    "src/languages/JSX.ts": {
+      "language": "typescript",
+      "lines": 17,
+      "chars": 445,
+      "tokens": 80,
+      "medianMs": 0.33
+    },
+    "src/languages/Java.ts": {
+      "language": "typescript",
+      "lines": 301,
+      "chars": 5919,
+      "tokens": 814,
+      "medianMs": 2.15
+    },
+    "src/languages/JavaScript.ts": {
+      "language": "typescript",
+      "lines": 289,
+      "chars": 6434,
+      "tokens": 968,
+      "medianMs": 2.54
+    },
+    "src/languages/Languages.ts": {
+      "language": "typescript",
+      "lines": 53,
+      "chars": 1430,
+      "tokens": 352,
+      "medianMs": 0.83
+    },
+    "src/languages/Markdown.ts": {
+      "language": "typescript",
+      "lines": 257,
+      "chars": 7701,
+      "tokens": 1417,
+      "medianMs": 3.83
+    },
+    "src/languages/PHP.ts": {
+      "language": "typescript",
+      "lines": 384,
+      "chars": 8618,
+      "tokens": 1360,
+      "medianMs": 3.4
+    },
+    "src/languages/Python.ts": {
+      "language": "typescript",
+      "lines": 309,
+      "chars": 7111,
+      "tokens": 974,
+      "medianMs": 2.78
+    },
+    "src/languages/Rust.ts": {
+      "language": "typescript",
+      "lines": 261,
+      "chars": 5402,
+      "tokens": 865,
+      "medianMs": 2.33
+    },
+    "src/languages/SCSS.ts": {
+      "language": "typescript",
+      "lines": 91,
+      "chars": 2025,
+      "tokens": 317,
+      "medianMs": 0.79
+    },
+    "src/languages/SQL.ts": {
+      "language": "typescript",
+      "lines": 243,
+      "chars": 4322,
+      "tokens": 667,
+      "medianMs": 1.49
+    },
+    "src/languages/TSX.ts": {
+      "language": "typescript",
+      "lines": 17,
+      "chars": 445,
+      "tokens": 80,
+      "medianMs": 0.28
+    },
+    "src/languages/TypeScript.ts": {
+      "language": "typescript",
+      "lines": 1035,
+      "chars": 26815,
+      "tokens": 4657,
+      "medianMs": 12.41
+    },
+    "src/languages/XML.ts": {
+      "language": "typescript",
+      "lines": 222,
+      "chars": 5198,
+      "tokens": 756,
+      "medianMs": 2.48
+    },
+    "src/languages/YAML.ts": {
+      "language": "typescript",
+      "lines": 117,
+      "chars": 2890,
+      "tokens": 487,
+      "medianMs": 1.21
+    },
+    "src/languages/context.ts": {
+      "language": "typescript",
+      "lines": 67,
+      "chars": 2020,
+      "tokens": 434,
+      "medianMs": 1.14
+    },
+    "src/languages/jsxStates.ts": {
+      "language": "typescript",
+      "lines": 249,
+      "chars": 5752,
+      "tokens": 1067,
+      "medianMs": 2.77
+    },
+    "src/languages/shared.ts": {
+      "language": "typescript",
+      "lines": 143,
+      "chars": 3733,
+      "tokens": 691,
+      "medianMs": 1.63
+    },
+    "src/server.ts": {
+      "language": "typescript",
+      "lines": 11,
+      "chars": 247,
+      "tokens": 28,
+      "medianMs": 0.13
+    },
+    "src/themes/dark.css": {
+      "language": "css",
+      "lines": 58,
+      "chars": 786,
+      "tokens": 124,
+      "medianMs": 0.22
+    },
+    "src/themes/light.css": {
+      "language": "css",
+      "lines": 58,
+      "chars": 799,
+      "tokens": 124,
+      "medianMs": 0.29
+    },
+    "src/types/embedLanguage.ts": {
+      "language": "typescript",
+      "lines": 13,
+      "chars": 467,
+      "tokens": 79,
+      "medianMs": 0.22
+    },
+    "src/types/highlighter.ts": {
+      "language": "typescript",
+      "lines": 23,
+      "chars": 518,
+      "tokens": 96,
+      "medianMs": 0.19
+    },
+    "src/types/incremental.ts": {
+      "language": "typescript",
+      "lines": 29,
+      "chars": 627,
+      "tokens": 90,
+      "medianMs": 0.22
+    },
+    "src/types/language.ts": {
+      "language": "typescript",
+      "lines": 18,
+      "chars": 667,
+      "tokens": 107,
+      "medianMs": 0.22
+    },
+    "src/types/parser.ts": {
+      "language": "typescript",
+      "lines": 12,
+      "chars": 185,
+      "tokens": 37,
+      "medianMs": 0.14
+    },
+    "src/types/socket.ts": {
+      "language": "typescript",
+      "lines": 114,
+      "chars": 2612,
+      "tokens": 468,
+      "medianMs": 0.85
+    },
+    "src/types/token.ts": {
+      "language": "typescript",
+      "lines": 35,
+      "chars": 750,
+      "tokens": 156,
+      "medianMs": 0.35
+    },
+    "src/types/tokenizer.ts": {
+      "language": "typescript",
+      "lines": 47,
+      "chars": 1182,
+      "tokens": 184,
+      "medianMs": 0.3
+    },
+    "src/utils/EmbedLanguage.ts": {
+      "language": "typescript",
+      "lines": 67,
+      "chars": 1846,
+      "tokens": 349,
+      "medianMs": 0.88
+    },
+    "src/utils/TokenGrouping.ts": {
+      "language": "typescript",
+      "lines": 15,
+      "chars": 351,
+      "tokens": 96,
+      "medianMs": 0.32
+    },
+    "test/browser-bundle.test.js": {
+      "language": "javascript",
+      "lines": 41,
+      "chars": 1385,
+      "tokens": 215,
+      "medianMs": 0.33
+    },
+    "test/csv.test.js": {
+      "language": "javascript",
+      "lines": 62,
+      "chars": 2545,
+      "tokens": 584,
+      "medianMs": 0.74
+    },
+    "test/extra-languages.test.js": {
+      "language": "javascript",
+      "lines": 165,
+      "chars": 5346,
+      "tokens": 1089,
+      "medianMs": 2
+    },
+    "test/first-char-filter.test.js": {
+      "language": "javascript",
+      "lines": 109,
+      "chars": 4520,
+      "tokens": 775,
+      "medianMs": 1.25
+    },
+    "test/highlighter.test.js": {
+      "language": "javascript",
+      "lines": 142,
+      "chars": 5002,
+      "tokens": 1066,
+      "medianMs": 1.44
+    },
+    "test/incremental-differential.test.js": {
+      "language": "javascript",
+      "lines": 432,
+      "chars": 11192,
+      "tokens": 2161,
+      "medianMs": 2.81
+    },
+    "test/incremental.test.js": {
+      "language": "javascript",
+      "lines": 218,
+      "chars": 9147,
+      "tokens": 2073,
+      "medianMs": 2.64
+    },
+    "test/index.js": {
+      "language": "javascript",
+      "lines": 24,
+      "chars": 526,
+      "tokens": 126,
+      "medianMs": 0.22
+    },
+    "test/jsx-markdown.test.js": {
+      "language": "javascript",
+      "lines": 219,
+      "chars": 7989,
+      "tokens": 1621,
+      "medianMs": 5.44
+    },
+    "test/languages.test.js": {
+      "language": "javascript",
+      "lines": 1240,
+      "chars": 42504,
+      "tokens": 8412,
+      "medianMs": 11.54
+    },
+    "test/long-lines.test.js": {
+      "language": "javascript",
+      "lines": 61,
+      "chars": 2411,
+      "tokens": 536,
+      "medianMs": 0.71
+    },
+    "test/package.test.js": {
+      "language": "javascript",
+      "lines": 100,
+      "chars": 4465,
+      "tokens": 946,
+      "medianMs": 1.32
+    },
+    "test/registry.test.js": {
+      "language": "javascript",
+      "lines": 76,
+      "chars": 3175,
+      "tokens": 665,
+      "medianMs": 0.92
+    },
+    "test/server.test.js": {
+      "language": "javascript",
+      "lines": 723,
+      "chars": 20750,
+      "tokens": 4595,
+      "medianMs": 5.86
+    },
+    "test/tokenizer.test.js": {
+      "language": "javascript",
+      "lines": 363,
+      "chars": 11533,
+      "tokens": 2239,
+      "medianMs": 4.23
+    }
+  }
+}

@@ -41,6 +41,8 @@
     "test:package": "npm run build && node test/package.test.js",
     "benchmark": "npm run build && node --expose-gc benchmark/index.js",
     "benchmark:smoke": "npm run build && node benchmark/smoke.js",
+    "benchmark:corpus": "npm run build && node --expose-gc benchmark/corpus.js",
+    "benchmark:corpus:update": "npm run build && node --expose-gc benchmark/corpus.js --update",
     "prepare": "node scripts/prepare.js",
     "dev": "tsc --watch",
     "start": "npm run build && node scripts/cli.js",

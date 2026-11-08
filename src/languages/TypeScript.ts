@@ -20,7 +20,6 @@ import {
 
 const GENERIC_LOOKAHEAD = 256;
 const MAX_GENERIC_TOKENS = 128;
-const ROOT_LIKE_STATES = new Set(["root", "jsxExpression"]);
 const ROOT_TYPE_PREFIXES = new Set([
   "interface",
   "class",
@@ -199,8 +198,7 @@ export class TypeScript implements LanguageDefinition {
   ];
 
   public getStates(): Record<string, TokenType[]> {
-    return {
-      root: [
+    const rootRules: TokenType[] = [
         {
           name: "function",
           pattern: /[A-Za-z_$][A-Za-z0-9_$]*(?=\s*\()/g,
@@ -286,6 +284,13 @@ export class TypeScript implements LanguageDefinition {
           name: "bracket",
           pattern: /\{/g,
           className: "nsh-bracket",
+          context: isClassBodyStart,
+          push: "inClassBody",
+        },
+        {
+          name: "bracket",
+          pattern: /\{/g,
+          className: "nsh-bracket",
           context: isInterfaceBodyStart,
           push: "inInterfaceBody",
         },
@@ -329,6 +334,60 @@ export class TypeScript implements LanguageDefinition {
         },
         { name: "non-null", pattern: /!(?![=])/g, className: "nsh-operator" },
         createVariableToken(),
+    ];
+
+    return {
+      root: rootRules,
+      inClassBody: [
+        {
+          name: "bracket",
+          pattern: /\}/g,
+          className: "nsh-bracket",
+          pop: true,
+        },
+        {
+          name: "bracket",
+          pattern: /\{/g,
+          className: "nsh-bracket",
+          context: isClassBodyStart,
+          push: "inClassBody",
+        },
+        {
+          name: "bracket",
+          pattern: /\{/g,
+          className: "nsh-bracket",
+          push: "inClassBlock",
+        },
+        {
+          name: "type-separator",
+          pattern: /:/g,
+          className: "nsh-operator",
+          context: isClassMemberTypeStart,
+          push: "inType",
+        },
+        ...rootRules,
+      ],
+      inClassBlock: [
+        {
+          name: "bracket",
+          pattern: /\}/g,
+          className: "nsh-bracket",
+          pop: true,
+        },
+        {
+          name: "bracket",
+          pattern: /\{/g,
+          className: "nsh-bracket",
+          context: isClassBodyStart,
+          push: "inClassBody",
+        },
+        {
+          name: "bracket",
+          pattern: /\{/g,
+          className: "nsh-bracket",
+          push: "inClassBlock",
+        },
+        ...rootRules,
       ],
       inType: [
         {
@@ -405,8 +464,7 @@ export class TypeScript implements LanguageDefinition {
         },
         {
           name: "bracket",
-          pattern: /\{/g,
-          className: "nsh-bracket",
+          pattern: /(?=\{)/g,
           pop: true,
         },
         {
@@ -676,7 +734,7 @@ function shouldEndTypeAtLineStart(
   _tokens: Token[],
   stateStack: string[],
 ): boolean {
-  if (position !== 0 || stateStack[stateStack.length - 1] !== "inType") {
+  if (position !== 0 || !isStateKind(stateStack, "inType")) {
     return false;
   }
 
@@ -699,10 +757,7 @@ function isReturnTypeObjectStart(
   tokens: Token[],
   stateStack: string[],
 ): boolean {
-  if (
-    line[position] !== "{" ||
-    stateStack[stateStack.length - 1] !== "inReturnType"
-  ) {
+  if (line[position] !== "{" || !isStateKind(stateStack, "inReturnType")) {
     return false;
   }
 
@@ -772,8 +827,97 @@ function isInterfaceBodyStart(
   );
 }
 
+function isClassBodyStart(
+  line: string,
+  position: number,
+  tokens: Token[],
+  stateStack: string[],
+): boolean {
+  if (line[position] !== "{" || !isRootLikeState(stateStack)) return false;
+
+  for (
+    let index = tokens.length - 1, steps = 0;
+    index >= 0 && steps < MAX_GENERIC_TOKENS;
+    index -= 1, steps += 1
+  ) {
+    const token = tokens[index];
+    if (token.type === "comment" || token.type === "jsdoc") continue;
+    if (
+      token.value === ";" ||
+      token.value === "{" ||
+      token.value === "}" ||
+      token.value === "="
+    ) {
+      return false;
+    }
+    if (token.type === "keyword" && token.value === "class") {
+      const next = nextSignificantToken(tokens, index);
+      return !(
+        next &&
+        (next.value === ":" || next.value === "," || next.value === "}")
+      );
+    }
+  }
+  return false;
+}
+
+function isClassMemberTypeStart(
+  line: string,
+  position: number,
+  tokens: Token[],
+  stateStack: string[],
+): boolean {
+  if (line[position] !== ":" || !isStateKind(stateStack, "inClassBody")) {
+    return false;
+  }
+
+  const last = lastSignificantToken(tokens);
+  if (!last) return false;
+
+  if (enclosingBracket(tokens)?.kind === "(") return false;
+
+  if (last.token.value === "?" && last.token.type === "operator") {
+    const variableIndex = previousSignificantIndex(tokens, last.index);
+    return tokens[variableIndex]?.type === "variable";
+  }
+  if (last.token.type === "bracket" && last.token.value === "]") return true;
+  if (last.token.type !== "variable") return false;
+
+  const previousIndex = previousSignificantIndex(tokens, last.index);
+  const previous = previousIndex >= 0 ? tokens[previousIndex] : undefined;
+  return previous?.value !== "?";
+}
+
+function nextSignificantToken(tokens: Token[], fromIndex: number): Token | undefined {
+  for (let index = fromIndex + 1; index < tokens.length; index += 1) {
+    const token = tokens[index];
+    if (token.type !== "comment" && token.type !== "jsdoc") return token;
+  }
+  return undefined;
+}
+
 function isRootLikeState(stateStack: string[]): boolean {
-  return ROOT_LIKE_STATES.has(stateStack[stateStack.length - 1]);
+  const state = baseStateName(stateStack[stateStack.length - 1]);
+  return (
+    state === "root" ||
+    state === "jsxExpression" ||
+    state === "inClassBody" ||
+    state === "inClassBlock" ||
+    state.endsWith("_root") ||
+    state.endsWith("_jsxExpression") ||
+    state.endsWith("_inClassBody") ||
+    state.endsWith("_inClassBlock")
+  );
+}
+
+function isStateKind(stateStack: string[], kind: string): boolean {
+  const state = baseStateName(stateStack[stateStack.length - 1]);
+  return state === kind || state.endsWith(`_${kind}`);
+}
+
+function baseStateName(state: string): string {
+  const separator = state.lastIndexOf(":");
+  return separator > 0 ? state.slice(0, separator) : state;
 }
 
 function isOptionalParameterMarker(tokens: Token[], markerIndex: number): boolean {

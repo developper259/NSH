@@ -11,6 +11,11 @@ const { CSS } = require("../dist/cjs/languages/CSS");
 const { JSON: JSONLanguage } = require("../dist/cjs/languages/JSON");
 const { Markdown } = require("../dist/cjs/languages/Markdown");
 const { CPP } = require("../dist/cjs/languages/CPP");
+const { Bash } = require("../dist/cjs/languages/Bash");
+const { SQL } = require("../dist/cjs/languages/SQL");
+const { Rust } = require("../dist/cjs/languages/Rust");
+const { Go } = require("../dist/cjs/languages/Go");
+const { SCSS } = require("../dist/cjs/languages/SCSS");
 const packageJson = require("../package.json");
 
 const SAMPLES = readInteger("NSH_BENCH_SAMPLES", 3, 1);
@@ -71,6 +76,52 @@ const LANGUAGES = [
       "Some **bold** text and `code`.",
       "- item",
       "| a | b |",
+    ],
+  },
+  {
+    name: "bash",
+    language: new Bash(),
+    lines: [
+      "#!/usr/bin/env bash",
+      'name="world"',
+      'if [[ -n "$name" ]]; then',
+      '  echo "hello $name"',
+      "fi",
+    ],
+  },
+  {
+    name: "sql",
+    language: new SQL(),
+    lines: [
+      "SELECT id, name FROM users;",
+      "WHERE active = true;",
+      "ORDER BY id DESC;",
+    ],
+  },
+  {
+    name: "rust",
+    language: new Rust(),
+    lines: [
+      "fn main() {",
+      "  let value = 42;",
+      '  println!("{}", value);',
+      "}",
+    ],
+  },
+  {
+    name: "go",
+    language: new Go(),
+    lines: ["package main", "func main() {", "  value := 42", "  _ = value", "}"],
+  },
+  {
+    name: "scss",
+    language: new SCSS(),
+    lines: [
+      "$primary: #333;",
+      ".card {",
+      "  color: $primary;",
+      "  &:hover { color: red; }",
+      "}",
     ],
   },
 ];

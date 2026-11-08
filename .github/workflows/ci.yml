@@ -23,4 +23,8 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: node benchmark/smoke.js
+      - name: Real corpus benchmark (non-blocking)
+        if: runner.os == 'Linux' && matrix.node-version == '22.x'
+        continue-on-error: true
+        run: node --expose-gc benchmark/corpus.js
       - run: npm pack --dry-run

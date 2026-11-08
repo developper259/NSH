@@ -47,6 +47,19 @@ export function createKeywordToken(keywords: string[]): TokenType {
   };
 }
 
+export function createBuiltinList(names: string[], tokenName = "builtin"): TokenType {
+  const alternatives = names
+    .slice()
+    .sort((left, right) => right.length - left.length)
+    .map(escapeRegExp)
+    .join("|");
+  return {
+    name: tokenName,
+    pattern: new RegExp(`\\b(?:${alternatives})\\b`, "g"),
+    className: "nsh-function",
+  };
+}
+
 export function createFunctionToken(): TokenType {
   return {
     name: 'function',

@@ -1,9 +1,55 @@
 import { LanguageDefinition } from "../types/language";
-import { StatePushResolver, TokenType } from "../types/token";
+import { StatePushResolver, Token, TokenType } from "../types/token";
+import { createEmbeddedStates } from "../utils/EmbedLanguage";
+import { JavaScript } from "./JavaScript";
+import { TypeScript } from "./TypeScript";
+import { JSX } from "./JSX";
+import { TSX } from "./TSX";
+import { Python } from "./Python";
+import { HTML } from "./HTML";
+import { CSS } from "./CSS";
+import { JSON as JSONLanguage } from "./JSON";
+import { YAML } from "./YAML";
+import { Bash } from "./Bash";
+import { SQL } from "./SQL";
+import { Rust } from "./Rust";
+import { Go } from "./Go";
+import { SCSS } from "./SCSS";
 
 const CODE_FENCE_STATE = "inCodeFence";
 const FENCE_PATTERN = /^\s*(`{3,}|~{3,})(.*)$/g;
 const FENCE_MARKER = /^\s*(`{3,}|~{3,})/;
+const FENCE_CLOSE_LINE = /^\s*(`{3,}|~{3,})\s*$/;
+
+interface EmbeddedLanguage {
+  language: LanguageDefinition;
+  prefix: string;
+  aliases: string[];
+}
+
+const EMBEDDED_LANGUAGES: EmbeddedLanguage[] = [
+  { language: new JavaScript(), prefix: "md_js_", aliases: ["javascript", "js", "mjs"] },
+  { language: new TypeScript(), prefix: "md_ts_", aliases: ["typescript", "ts"] },
+  { language: new JSX(), prefix: "md_jsx_", aliases: ["jsx"] },
+  { language: new TSX(), prefix: "md_tsx_", aliases: ["tsx"] },
+  { language: new Python(), prefix: "md_py_", aliases: ["python", "py"] },
+  { language: new HTML(), prefix: "md_html_", aliases: ["html", "htm"] },
+  { language: new CSS(), prefix: "md_css_", aliases: ["css"] },
+  { language: new JSONLanguage(), prefix: "md_json_", aliases: ["json"] },
+  { language: new YAML(), prefix: "md_yaml_", aliases: ["yaml", "yml"] },
+  { language: new Bash(), prefix: "md_sh_", aliases: ["bash", "sh", "shell", "zsh"] },
+  { language: new SQL(), prefix: "md_sql_", aliases: ["sql"] },
+  { language: new Rust(), prefix: "md_rs_", aliases: ["rust", "rs"] },
+  { language: new Go(), prefix: "md_go_", aliases: ["go", "golang"] },
+  { language: new SCSS(), prefix: "md_scss_", aliases: ["scss"] },
+];
+
+const EMBEDDED_PREFIX_BY_NAME = new Map<string, string>();
+for (const entry of EMBEDDED_LANGUAGES) {
+  for (const name of entry.aliases) {
+    EMBEDDED_PREFIX_BY_NAME.set(name, entry.prefix);
+  }
+}
 
 const fencePush: StatePushResolver = (
   _line,
@@ -12,9 +58,20 @@ const fencePush: StatePushResolver = (
   _stateStack,
   matched,
 ) => {
-  const marker = FENCE_MARKER.exec(matched)?.[1] ?? "```";
-  return `${CODE_FENCE_STATE}:${encodeURIComponent(marker)}`;
+  const markerMatch = FENCE_MARKER.exec(matched);
+  const marker = markerMatch?.[1] ?? "```";
+  const info = markerMatch
+    ? matched.slice(markerMatch[0].length).trim().toLowerCase()
+    : "";
+  const languageName = info.split(/\s+/)[0];
+  const prefix = EMBEDDED_PREFIX_BY_NAME.get(languageName);
+  if (!prefix) {
+    return `${CODE_FENCE_STATE}:${encodeURIComponent(marker)}`;
+  }
+  return `${prefix}root:${encodeURIComponent(marker)}`;
 };
+
+let markdownStates: Record<string, TokenType[]> | null = null;
 
 export class Markdown implements LanguageDefinition {
   name = "markdown";
@@ -23,7 +80,27 @@ export class Markdown implements LanguageDefinition {
   lineIndexSensitive = false;
 
   public getStates(): Record<string, TokenType[]> {
-    return {
+    if (markdownStates) return markdownStates;
+
+    const embeddedStates: Record<string, TokenType[]> = {};
+    for (const entry of EMBEDDED_LANGUAGES) {
+      Object.assign(
+        embeddedStates,
+        createEmbeddedStates({
+          language: entry.language,
+          exitRule: {
+            name: "code-fence-end",
+            pattern: createFenceClosePattern(),
+            className: "nsh-string",
+            context: makeFenceEndContext(entry.prefix),
+          },
+          prefix: entry.prefix,
+          exitMode: "parent",
+        }),
+      );
+    }
+
+    markdownStates = {
       root: [
         {
           name: "code-fence",
@@ -110,7 +187,7 @@ export class Markdown implements LanguageDefinition {
       [CODE_FENCE_STATE]: [
         {
           name: "code-fence-end",
-          pattern: /^\s*(`{3,}|~{3,})\s*$/g,
+          pattern: createFenceClosePattern(),
           className: "nsh-string",
           pop: true,
           context: isFenceEnd,
@@ -121,8 +198,42 @@ export class Markdown implements LanguageDefinition {
           className: "nsh-string",
         },
       ],
+      ...embeddedStates,
     };
+    return markdownStates;
   }
+}
+
+function createFenceClosePattern(): RegExp {
+  return /^\s*(`{3,}|~{3,})\s*$/g;
+}
+
+function makeFenceEndContext(prefix: string) {
+  return (
+    line: string,
+    position: number,
+    _tokens: Token[],
+    stateStack: string[],
+  ): boolean => {
+    if (position !== 0) return false;
+    const markerState = findEmbeddedRootState(stateStack, prefix);
+    if (!markerState) return false;
+    const encodedMarker = markerState.slice(`${prefix}root:`.length);
+    return isClosingFence(line, decodeURIComponent(encodedMarker));
+  };
+}
+
+function findEmbeddedRootState(
+  stateStack: string[],
+  prefix: string,
+): string | undefined {
+  const exact = `${prefix}root`;
+  const parameterized = `${prefix}root:`;
+  for (let index = stateStack.length - 1; index >= 0; index -= 1) {
+    const state = stateStack[index];
+    if (state === exact || state.startsWith(parameterized)) return state;
+  }
+  return undefined;
 }
 
 function isFenceEnd(
@@ -134,10 +245,12 @@ function isFenceEnd(
   if (position !== 0) return false;
 
   const state = stateStack[stateStack.length - 1];
-  const encodedMarker = state.slice(CODE_FENCE_STATE.length + 1);
-  const opening = decodeURIComponent(encodedMarker);
-  const match = /^\s*(`{3,}|~{3,})\s*$/.exec(line);
-  if (!match) return false;
+  const encodedMarker = state.slice(state.lastIndexOf(":") + 1);
+  return isClosingFence(line, decodeURIComponent(encodedMarker));
+}
 
+function isClosingFence(line: string, opening: string): boolean {
+  const match = FENCE_CLOSE_LINE.exec(line);
+  if (!match) return false;
   return match[1][0] === opening[0] && match[1].length >= opening.length;
 }

@@ -4,11 +4,17 @@ export interface TokenizerOptions {
   maxStateDepth?: number;
   /** Validates the language definition before compiling it. Defaults to true. */
   validate?: boolean;
+  /**
+   * Skips rules whose first character cannot match the current position.
+   * Defaults to true; disable only when debugging a custom rule.
+   */
+  firstCharacterFilter?: boolean;
 }
 
 export interface CompiledTokenRule {
   original: TokenType;
   matcher: RegExp;
+  firstChars?: Uint8Array;
 }
 
 export interface CompiledState {
