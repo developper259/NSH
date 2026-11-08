@@ -38,8 +38,8 @@
   },
   "scripts": {
     "clean": "node scripts/clean.js",
-    "build": "npm run clean && tsc -p tsconfig.cjs.json && tsc -p tsconfig.types.json && node scripts/build-esm-wrapper.js && node scripts/copy-themes.js",
-    "build:cjs": "tsc -p tsconfig.cjs.json",
+    "build": "npm run clean && npm run build:cjs && tsc -p tsconfig.types.json && node scripts/build-esm-wrapper.js && node scripts/copy-themes.js",
+    "build:cjs": "tsc -p tsconfig.cjs.json && node scripts/build-worker.js",
     "build:esm": "npm run build:cjs && node scripts/build-esm-wrapper.js",
     "typecheck": "tsc --noEmit",
     "test": "npm run build && node scripts/run-tests.js",

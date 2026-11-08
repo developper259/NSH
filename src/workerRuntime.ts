@@ -1,15 +1,13 @@
-import { isMainThread, parentPort, workerData } from "node:worker_threads";
-
-interface WorkerBootstrap {
-  tokenizerPath: string;
-  languagesPath: string;
-}
+import { isMainThread, parentPort } from "node:worker_threads";
+import { Tokenizer } from "./core/Tokenizer";
+import { defaultRegistry } from "./languages/Languages";
+import type { TokenizerOptions } from "./types/tokenizer";
 
 interface WorkerRequest {
   id: number;
   type: "tokenize" | "tokenizeLine";
   language: string;
-  options: import("./types/tokenizer").TokenizerOptions;
+  options: TokenizerOptions;
   code?: string;
   initialStateStack?: string[];
   line?: string;
@@ -17,13 +15,10 @@ interface WorkerRequest {
 }
 
 if (!isMainThread && parentPort) {
-  const bootstrap = workerData as WorkerBootstrap;
-  const { Tokenizer } = require(bootstrap.tokenizerPath) as typeof import("./core/Tokenizer");
-  const { defaultRegistry } = require(bootstrap.languagesPath) as typeof import("./languages/Languages");
+  const port = parentPort;
+  const tokenizers = new Map<string, Tokenizer>();
 
-  const tokenizers = new Map<string, InstanceType<typeof Tokenizer>>();
-
-  parentPort.on("message", (request: WorkerRequest) => {
+  port.on("message", (request: WorkerRequest) => {
     try {
       const language = defaultRegistry.getLanguage(request.language);
       if (!language) {
@@ -46,9 +41,9 @@ if (!isMainThread && parentPort) {
               request.initialStateStack ?? ["root"],
               request.lineIndex ?? 0,
             );
-      parentPort?.postMessage({ id: request.id, ok: true, result });
+      port.postMessage({ id: request.id, ok: true, result });
     } catch (error) {
-      parentPort?.postMessage({
+      port.postMessage({
         id: request.id,
         ok: false,
         error: {

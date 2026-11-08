@@ -145,12 +145,7 @@ export class AsyncTokenizer {
   private ensureWorker(): Worker {
     if (this.worker) return this.worker;
 
-    const worker = new Worker(require.resolve("./workerRuntime"), {
-      workerData: {
-        tokenizerPath: require.resolve("./core/Tokenizer"),
-        languagesPath: require.resolve("./languages/Languages"),
-      },
-    });
+    const worker = new Worker(require.resolve("./workerRuntime"));
     this.worker = worker;
     worker.on("message", (response: WorkerResponse) => {
       const pending = this.pending.get(response.id);
