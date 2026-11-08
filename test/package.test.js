@@ -16,8 +16,10 @@ function run(command, args, cwd) {
       shell: process.platform === "win32" && command === "npm",
     });
   } catch (error) {
-    const stderr = typeof error.stderr === "string" ? error.stderr.trim() : "";
-    if (stderr) error.message += `\n${stderr}`;
+    const stderr = error.stderr ? error.stderr.toString().trim() : "";
+    const stdout = error.stdout ? error.stdout.toString().trim() : "";
+    if (stderr) error.message += `\nstderr:\n${stderr}`;
+    if (stdout) error.message += `\nstdout:\n${stdout}`;
     throw error;
   }
 }
@@ -89,21 +91,27 @@ test("GitHub-style install works via the prepare lifecycle", { timeout: 120000 }
     });
     run("git", ["init", "-q"], gitDir);
     run("git", ["add", "."], gitDir);
-    run(
-      "git",
-      [
-        "-c",
-        "user.email=nsh-tests@example.invalid",
-        "-c",
-        "user.name=NSH tests",
-        "-c",
-        "commit.gpgsign=false",
-        "commit",
-        "-qm",
-        "package test",
-      ],
-      gitDir,
-    );
+    try {
+      run(
+        "git",
+        [
+          "-c",
+          "user.email=nsh-tests@example.invalid",
+          "-c",
+          "user.name=NSH tests",
+          "-c",
+          "commit.gpgsign=false",
+          "commit",
+          "-qm",
+          "package test",
+        ],
+        gitDir,
+      );
+    } catch (error) {
+      const status = run("git", ["status", "--porcelain=v1"], gitDir);
+      error.message += `\ngit status:\n${status}`;
+      throw error;
+    }
 
     const consumer = path.join(tmp, "consumer");
     fs.mkdirSync(consumer, { recursive: true });
