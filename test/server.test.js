@@ -352,11 +352,21 @@ test("documents are removed when the connection closes", async () => {
     assert.equal(server.getDocumentCount(), 1);
     client.close();
     await once(client, "close");
+    await waitUntil(() => server.getDocumentCount() === 0);
     assert.equal(server.getDocumentCount(), 0);
   } finally {
     await server.stop();
   }
 });
+
+async function waitUntil(predicate, timeoutMs = 2000) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (predicate()) return;
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+  assert.fail("condition was not met before the timeout");
+}
 
 function connectionOutcome(url, options) {
   return new Promise((resolve) => {
