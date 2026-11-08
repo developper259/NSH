@@ -35,6 +35,7 @@ Although NSH is developed primarily for NCE, it is not coupled to NCE and can be
 - 🔌 Optional WebSocket server
 - 🧩 Custom language definitions with validation
 - 📝 JSX, TSX and Markdown definitions
+- ⏱️ Worker-based timeout for untrusted input (Node)
 - 🎭 Built-in light and dark themes
 - 📦 CommonJS and ESM support
 - 🔎 Language detection by file extension
@@ -381,8 +382,9 @@ include `js`, `ts`, `jsx`, `tsx`, `py`, `html`, `css`, `json`, `yaml`, `sh`, `sq
 Fences may be opened inside blockquotes and list items; blockquote prefixes are
 preserved as tokens while the remaining code is tokenized by the embedded language.
 
-SCSS and indented Sass are supported. Sass is highlighted lexically by line and
-indentation; it does not build a structural indentation parser.
+SCSS and indented Sass are supported. Sass tracks indentation blocks in its
+lexical state stack and highlights their contents; it does not build a full Sass
+AST.
 
 ---
 
@@ -588,6 +590,38 @@ Language definitions are treated as immutable after a tokenizer compiles them. I
 
 ---
 
+# Worker tokenizer (Node)
+
+For untrusted or generated input, tokenization can run in a Worker with a hard
+timeout:
+
+```ts
+import { AsyncTokenizer, RegexTimeoutError } from "nsh/worker";
+
+const tokenizer = new AsyncTokenizer("typescript", { timeoutMs: 1000 });
+
+try {
+  const { tokens, finalStateStack } = await tokenizer.tokenize(source);
+  console.log(tokens, finalStateStack);
+} catch (error) {
+  if (error instanceof RegexTimeoutError) {
+    console.error("Tokenization timed out");
+  }
+} finally {
+  await tokenizer.close();
+}
+```
+
+A timeout terminates the Worker, so even a regex that is already backtracking is
+stopped. The next call starts a fresh Worker. `tokenizeLine()` is also available.
+
+This entry point is Node-only because it uses `node:worker_threads`. Browser
+applications can use the same architecture with their own Web Worker. The worker
+resolves languages from the built-in registry by name or alias; custom language
+definitions containing functions are not serialized across the Worker boundary.
+
+---
+
 # Optional WebSocket server
 
 NSH also provides an optional Node.js WebSocket server.
@@ -750,6 +784,12 @@ Node-only WebSocket server:
 import { NSHServer } from "nsh/server";
 ```
 
+Node-only worker tokenizer with a real timeout:
+
+```ts
+import { AsyncTokenizer } from "nsh/worker";
+```
+
 Themes:
 
 ```ts
@@ -867,13 +907,13 @@ Initial tokenization:
 | HTML       | 10,000 | 279,999  | 75,000   | 79.45     | 112.34 |
 | CSS        | 10,000 | 349,999  | 110,000  | 167.35    | 176.45 |
 | JSON       | 10,000 | 429,999  | 130,000  | 128.64    | 132.30 |
-| Markdown   | 10,000 | 147,499  | 17,500   | 67.33     | 69.53  |
+| Markdown   | 10,000 | 147,499  | 20,000   | 180.66    | 260.22 |
 | Bash       | 10,000 | 165,999  | 44,000   | 44.72     | 49.84  |
 | SQL        | 10,000 | 223,338  | 56,668   | 88.44     | 90.46  |
 | Rust       | 10,000 | 142,499  | 52,500   | 107.45    | 411.40 |
 | Go         | 10,000 | 109,999  | 28,000   | 42.44     | 49.94  |
 | SCSS       | 10,000 | 141,999  | 38,000   | 69.13     | 71.27  |
-| Sass       | 10,000 | 127,999  | 24,000   | 78.80     | 190.06 |
+| Sass       | 10,000 | 127,999  | 30,000   | 277.08    | 432.38 |
 
 Incremental updates on 100,000-line documents:
 
@@ -1011,8 +1051,8 @@ npm test
 The suite covers tokenizer rules and validation, seeded differential tests that
 compare incremental tokenization against a full retokenization across languages,
 first-character-filter equivalence tests, long-line regressions, Highlighter
-escaping/text preservation, the registry, the WebSocket server, browser bundling
-and npm packaging.
+escaping/text preservation, the registry, the WebSocket server, the worker timeout
+path, browser bundling and npm packaging.
 
 Run only the packaging checks:
 
@@ -1125,10 +1165,8 @@ Examples include:
 - advanced YAML indentation semantics;
 - some deeply nested TypeScript type constructs;
 - JSX/TSX angle-bracket ambiguity between generics, type parameters and tags;
-- Markdown headings, blockquotes and table headers are line-level constructs rather than nested inline parses;
-- JSX closing tags must terminate on the same physical line;
-- Bash/SCSS/Sass/SQL/Rust/Go support is lexical and intentionally does not attempt full language validation;
-- Sass indentation is lexically highlighted rather than structurally parsed;
+- Markdown headings and blockquote content use inline rules, but table header rows are not distinguished from body rows;
+- Bash/SCSS/Sass/SQL/Rust/Go support is lexical and intentionally does not attempt full grammar validation;
 - SQL dialects and Bash grammar variants are approximated.
 
 Generic detection no longer uses fixed character windows. TypeScript, Java and C++
@@ -1154,9 +1192,11 @@ Increase `maxStateDepth` when a language legitimately needs a deeper stack.
 NSH cannot interrupt a synchronous regular expression that has already entered
 catastrophic backtracking. This is a JavaScript runtime limitation: there is no
 portable way to abort a blocked native regex call from the same thread. Validation
-rejects structural mistakes and reports obvious nested quantifiers as warnings;
-authors must keep regexes bounded and prefer lexical states for complex syntax.
-An asynchronous Worker/Web Worker tokenizer would be required for a true timeout.
+rejects structural mistakes and rejects obvious nested quantifiers; authors must
+keep regexes bounded and prefer lexical states for complex syntax.
+For a true timeout, use the Node-only `nsh/worker` entry point, which runs
+tokenization in a `worker_threads` Worker and terminates it on timeout. Browser
+applications can use the same pattern with their own Web Worker.
 
 Full-document `getTokens()` and `getHTML()` are O(source + tokens) and allocate
 their outputs. For editor refreshes, use line or range APIs instead.

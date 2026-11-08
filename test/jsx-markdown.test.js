@@ -88,6 +88,20 @@ test("JSX does not treat comparisons or TSX generic arrows as tags", () => {
   assert.equal(constParameter.some((token) => token.type === "jsx-tag"), false);
 });
 
+test("JSX allows closing tags to span physical lines", () => {
+  const code = [
+    "<div>",
+    "  <span>text</span>",
+    "</div",
+    ">",
+    "const after = 1;",
+  ].join("\n");
+  const tokens = tokenize(new JSX(), code);
+  assertToken(tokens, "</div", "jsx-tag");
+  assertToken(tokens, ">", "tag-bracket");
+  assertToken(tokens, "after", "variable");
+});
+
 test("TSX supports generic arguments on component tags", () => {
   const code = [
     "const view = (value: string) => (",
@@ -146,7 +160,8 @@ test("Markdown highlights headings, lists, inline markup, links, tables and HTML
   ].join("\n");
   const tokens = tokenize(new Markdown(), code);
 
-  assertToken(tokens, "# Title", "heading");
+  assertToken(tokens, "#", "heading");
+  assertToken(tokens, "Title", "heading-text");
   assertToken(tokens, "**bold**", "bold");
   assertToken(tokens, "*italic*", "italic");
   assertToken(tokens, "`inline`", "inline-code");
@@ -164,6 +179,22 @@ test("Markdown highlights headings, lists, inline markup, links, tables and HTML
   assertToken(tokens, "|", "table-delimiter");
   assertToken(tokens, '<div class="note">', "tag");
   assertToken(tokens, "</div>", "tag");
+});
+
+test("Markdown headings keep inline markup tokenized", () => {
+  const tokens = tokenize(
+    new Markdown(),
+    "# **Bold** and [link](https://example.com) with `code`\n\n> # Quoted heading",
+  );
+  assertToken(tokens, "#", "heading");
+  assertToken(tokens, "**Bold**", "bold");
+  assertToken(tokens, "[link](https://example.com)", "link");
+  assertToken(tokens, "`code`", "inline-code");
+  assert.ok(tokens.some((token) => token.type === "heading-text"));
+  assert.equal(
+    tokens.filter((token) => token.value === "#" && token.type === "heading").length,
+    2,
+  );
 });
 
 test("Markdown code fences respect marker type and closing length", () => {

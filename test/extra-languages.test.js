@@ -231,7 +231,7 @@ test("indented Sass handles variables, directives, properties and selectors", ()
     "    color: $primary",
     "  content: #{$primary}",
   ].join("\n");
-  const tokens = tokenize(new Sass(), code);
+  const tokens = new Tokenizer(new Sass()).tokenize(code);
 
   find(tokens, "$primary", "variable");
   find(tokens, "@mixin", "at-rule");
@@ -243,6 +243,21 @@ test("indented Sass handles variables, directives, properties and selectors", ()
   find(tokens, ":hover", "pseudo-class");
   assert.ok(tokens.some((token) => token.type === "interpolation"));
   assert.ok(tokens.some((token) => token.type === "number" && token.value === "20px"));
+});
+
+test("Sass tracks indentation blocks", () => {
+  const tokenizer = new Tokenizer(new Sass());
+  const lines = ["a", "  color: red", "  b", "    width: 1px", "c"];
+  let state = ["root"];
+  const states = [];
+  for (let index = 0; index < lines.length; index += 1) {
+    state = tokenizer.tokenizeLine(lines[index], state, index).finalStateStack;
+    states.push(state);
+  }
+  assert.deepEqual(states[0], ["root"]);
+  assert.ok(states[1].some((name) => name.startsWith("sassBlock:2")));
+  assert.ok(states[3].some((name) => name.startsWith("sassBlock:4")));
+  assert.deepEqual(states[4], ["root"]);
 });
 
 test("new language extensions are detected", () => {

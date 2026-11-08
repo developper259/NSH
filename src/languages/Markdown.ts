@@ -122,8 +122,9 @@ export class Markdown implements LanguageDefinition {
         },
         {
           name: "heading",
-          pattern: /^#{1,6}\s+.*$/g,
+          pattern: /#{1,6}(?=\s)/g,
           className: "nsh-keyword",
+          context: isHeadingMarker,
         },
         {
           name: "separator",
@@ -195,6 +196,12 @@ export class Markdown implements LanguageDefinition {
           pattern: /\\[\\`*_{}\[\]()#+.!>-]/g,
           className: "nsh-operator",
         },
+        {
+          name: "heading-text",
+          pattern: /[^\s*_`\[\]!<>|\\]+/g,
+          className: "nsh-keyword",
+          context: isHeadingText,
+        },
       ],
       [CODE_FENCE_STATE]: [
         {
@@ -255,6 +262,18 @@ function isFenceStart(
 ): boolean {
   if (line[position] !== "`" && line[position] !== "~") return false;
   return FENCE_PREFIX.test(line.slice(0, position));
+}
+
+const HEADING_TEXT_PREFIX =
+  /^(?:(?: {0,3}>[ \t]?)|(?: {0,3}(?:[-*+]|\d{1,9}[.)])[ \t]+)|\s)*#{1,6}\s+/;
+
+function isHeadingMarker(line: string, position: number): boolean {
+  if (line[position] !== "#") return false;
+  return FENCE_PREFIX.test(line.slice(0, position));
+}
+
+function isHeadingText(line: string, position: number): boolean {
+  return HEADING_TEXT_PREFIX.test(line.slice(0, position));
 }
 
 function isQuotedFencePrefix(

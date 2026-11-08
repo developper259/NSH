@@ -1,5 +1,5 @@
 import { LanguageDefinition } from "../types/language";
-import { Token, TokenType } from "../types/token";
+import { StatePushResolver, Token, TokenType } from "../types/token";
 
 const sassAtRule: TokenType = {
   name: "at-rule",
@@ -33,8 +33,7 @@ export class Sass implements LanguageDefinition {
   lineIndexSensitive = false;
 
   public getStates(): Record<string, TokenType[]> {
-    return {
-      root: [
+    const contentRules: TokenType[] = [
         {
           name: "comment",
           pattern: /\/\/[^\n]*/g,
@@ -119,7 +118,25 @@ export class Sass implements LanguageDefinition {
           pattern: /[{}():;,>+~*|]/g,
           className: "nsh-operator",
         },
-      ],
+    ];
+
+    const indentationRules: TokenType[] = [
+      {
+        name: "indent",
+        pattern: /^/g,
+        popCount: 1,
+        context: shouldPopSassBlock,
+      },
+      {
+        name: "indent",
+        pattern: /^[ \t]+/g,
+        push: sassIndentPush,
+      },
+    ];
+
+    return {
+      root: [...indentationRules, ...contentRules],
+      sassBlock: [...indentationRules, ...contentRules],
       inMultiLineComment: [
         {
           name: "comment",
@@ -135,6 +152,51 @@ export class Sass implements LanguageDefinition {
       ],
     };
   }
+}
+
+const sassIndentPush: StatePushResolver = (
+  _line,
+  _position,
+  _tokens,
+  stateStack,
+  matched,
+) => {
+  const indent = matched.length;
+  if (indent > currentSassIndent(stateStack)) {
+    return `sassBlock:${indent}`;
+  }
+  return undefined;
+};
+
+function shouldPopSassBlock(
+  line: string,
+  position: number,
+  _tokens: Token[],
+  stateStack: string[],
+): boolean {
+  if (position !== 0) return false;
+  const top = stateStack[stateStack.length - 1];
+  if (!isSassBlockState(top)) return false;
+  const indent = line.length - line.trimStart().length;
+  return indent <= sassBlockIndent(top);
+}
+
+function currentSassIndent(stateStack: string[]): number {
+  const top = stateStack[stateStack.length - 1];
+  return isSassBlockState(top) ? sassBlockIndent(top) : -1;
+}
+
+function isSassBlockState(state: string): boolean {
+  const separator = state.lastIndexOf(":");
+  const base = separator > 0 ? state.slice(0, separator) : state;
+  return base === "sassBlock" || base.endsWith("_sassBlock");
+}
+
+function sassBlockIndent(state: string): number {
+  const separator = state.lastIndexOf(":");
+  if (separator < 0) return 0;
+  const indent = Number(state.slice(separator + 1));
+  return Number.isFinite(indent) ? indent : 0;
 }
 
 const SASS_PSEUDO =

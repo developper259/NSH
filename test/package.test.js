@@ -42,11 +42,17 @@ test("npm pack + install in a temp project exposes CJS, ESM, types and themes", 
     const cjsServer = run("node", ["-e", `const server = require("nsh/server"); console.log(typeof server.NSHServer);`], tmp);
     assert.match(cjsServer, /function/);
 
+    const cjsWorker = run("node", ["-e", `const worker = require("nsh/worker"); console.log(typeof worker.AsyncTokenizer);`], tmp);
+    assert.match(cjsWorker, /function/);
+
     const esmMain = run("node", ["--input-type=module", "-e", `const nsh = await import("nsh"); console.log(typeof nsh.Highlighter, typeof nsh.Tokenizer, typeof nsh.JavaScript);`], tmp);
     assert.match(esmMain, /function function function/);
 
     const esmServer = run("node", ["--input-type=module", "-e", `const srv = await import("nsh/server"); console.log(typeof srv.NSHServer);`], tmp);
     assert.match(esmServer, /function/);
+
+    const esmWorker = run("node", ["--input-type=module", "-e", `const worker = await import("nsh/worker"); console.log(typeof worker.AsyncTokenizer);`], tmp);
+    assert.match(esmWorker, /function/);
 
     const nodeModules = path.join(tmp, "node_modules", "nsh");
     assert.ok(fs.existsSync(path.join(nodeModules, "dist", "types", "index.d.ts")), "index.d.ts missing");

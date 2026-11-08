@@ -122,6 +122,14 @@ export function validateStates(states: unknown): LanguageValidationResult {
       validateOptionalType(rule, "context", "function", where, errors);
       validateOptionalType(rule, "pop", "boolean", where, errors);
       validateOptionalType(rule, "className", "string", where, errors);
+      if (
+        rule.popCount !== undefined &&
+        (typeof rule.popCount !== "number" ||
+          !Number.isInteger(rule.popCount) ||
+          rule.popCount < 0)
+      ) {
+        errors.push(`${where} popCount must be a non-negative integer`);
+      }
 
       if (rule.push !== undefined) {
         if (typeof rule.push === "function") {
@@ -150,7 +158,8 @@ export function validateStates(states: unknown): LanguageValidationResult {
         const reducesState =
           rule.pop === true ||
           typeof rule.popTo === "string" ||
-          typeof rule.popPrefix === "string";
+          typeof rule.popPrefix === "string" ||
+          (typeof rule.popCount === "number" && rule.popCount > 0);
         if (!reducesState) {
           errors.push(
             `${where} can match an empty string without pop, popTo or popPrefix`,

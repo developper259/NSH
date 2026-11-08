@@ -19,6 +19,11 @@
       "import": "./dist/esm/server.js",
       "require": "./dist/cjs/server.js"
     },
+    "./worker": {
+      "types": "./dist/types/worker.d.ts",
+      "import": "./dist/esm/worker.js",
+      "require": "./dist/cjs/worker.js"
+    },
     "./themes/*": "./dist/themes/*",
     "./package.json": "./package.json"
   },

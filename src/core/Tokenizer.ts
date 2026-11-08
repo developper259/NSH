@@ -146,7 +146,13 @@ export class Tokenizer {
         if (match[0].length === 0) {
           if (
             rule.original.push ||
-            !(rule.original.pop || rule.original.popTo || rule.original.popPrefix)
+            !(
+              rule.original.pop ||
+              rule.original.popTo ||
+              rule.original.popPrefix ||
+              (rule.original.popCount !== undefined &&
+                rule.original.popCount > 0)
+            )
           ) {
             continue;
           }
@@ -234,6 +240,15 @@ export class Tokenizer {
   ): boolean {
     const before = stateStack.join("\u0000");
 
+    if (rule.popCount !== undefined) {
+      for (
+        let count = 0;
+        count < rule.popCount && stateStack.length > 1;
+        count += 1
+      ) {
+        stateStack.pop();
+      }
+    }
     if (rule.pop && stateStack.length > 1) {
       stateStack.pop();
     }

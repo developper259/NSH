@@ -7,6 +7,7 @@ const JSX_CHILDREN_STATE = "jsxChildren";
 const JSX_EXPRESSION_STATE = "jsxExpression";
 const JSX_TYPE_ARGUMENTS_STATE = "jsxTypeArguments";
 const JSX_TYPE_OBJECT_STATE = "jsxTypeObject";
+const JSX_CLOSING_TAG_STATE = "jsxClosingTag";
 const JSX_DOUBLE_QUOTE_STATE = "jsxDoubleQuote";
 const JSX_SINGLE_QUOTE_STATE = "jsxSingleQuote";
 
@@ -124,6 +125,12 @@ const childrenRules: TokenType[] = [
   },
   {
     name: "jsx-tag",
+    pattern: /<\/[A-Za-z_$][A-Za-z0-9_$.:-]*/g,
+    className: "nsh-keyword",
+    push: JSX_CLOSING_TAG_STATE,
+  },
+  {
+    name: "jsx-tag",
     pattern: OPEN_TAG,
     className: "nsh-keyword",
     push: JSX_TAG_STATE,
@@ -146,6 +153,16 @@ const childrenRules: TokenType[] = [
     className: "nsh-number",
   },
   { name: "text", pattern: /[^<{]+/g },
+];
+
+const closingTagRules: TokenType[] = [
+  {
+    name: "tag-bracket",
+    pattern: />/g,
+    className: "nsh-keyword",
+    popCount: 2,
+  },
+  { name: "text", pattern: /[^\s>]+/g },
 ];
 
 const typeNameRules: TokenType[] = [
@@ -255,6 +272,7 @@ export function createJsxStates(
     [JSX_EXPRESSION_STATE]: expressionRules,
     [JSX_TYPE_ARGUMENTS_STATE]: typeArgumentRules,
     [JSX_TYPE_OBJECT_STATE]: typeObjectRules,
+    [JSX_CLOSING_TAG_STATE]: closingTagRules,
     [JSX_DOUBLE_QUOTE_STATE]: doubleQuoteRules,
     [JSX_SINGLE_QUOTE_STATE]: singleQuoteRules,
   };

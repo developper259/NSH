@@ -31,4 +31,6 @@ export interface TokenType {
   popTo?: string;
   /** Pop only the contiguous embedded states with this prefix. */
   popPrefix?: string;
+  /** Pop up to this many states without going below the root state. */
+  popCount?: number;
 }
