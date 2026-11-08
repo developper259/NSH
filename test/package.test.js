@@ -82,15 +82,14 @@ test("GitHub-style install works via the prepare lifecycle", { timeout: 120000 }
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "nsh-git-"));
   const gitDir = path.join(tmp, "nsh-repo");
   try {
-    fs.cpSync(ROOT, gitDir, {
-      recursive: true,
-      filter: (src) => {
-        const rel = path.relative(ROOT, src);
-        return !rel.startsWith("node_modules") && !rel.startsWith("dist") && !rel.startsWith(".");
-      },
-    });
+    copyRepositoryFiles(gitDir);
     run("git", ["init", "-q"], gitDir);
     run("git", ["add", "."], gitDir);
+    assert.notEqual(
+      run("git", ["status", "--porcelain=v1"], gitDir).trim(),
+      "",
+      "copied repository has no files to commit",
+    );
     try {
       run(
         "git",
@@ -123,3 +122,28 @@ test("GitHub-style install works via the prepare lifecycle", { timeout: 120000 }
     fs.rmSync(tmp, { recursive: true, force: true });
   }
 });
+
+function copyRepositoryFiles(destination) {
+  const entries = [
+    "package.json",
+    "package-lock.json",
+    "tsconfig.json",
+    "tsconfig.cjs.json",
+    "tsconfig.types.json",
+    "scripts",
+    "src",
+    "README.md",
+    "LICENSE",
+  ];
+  fs.mkdirSync(destination, { recursive: true });
+  for (const entry of entries) {
+    const source = path.join(ROOT, entry);
+    if (!fs.existsSync(source)) continue;
+    const target = path.join(destination, entry);
+    if (fs.statSync(source).isDirectory()) {
+      fs.cpSync(source, target, { recursive: true });
+    } else {
+      fs.copyFileSync(source, target);
+    }
+  }
+}
