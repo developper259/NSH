@@ -1,7 +1,4 @@
-import { Worker, isMainThread, parentPort } from "node:worker_threads";
-import { Tokenizer } from "./core/Tokenizer";
-import { defaultRegistry } from "./languages/Languages";
-import type { LanguageDefinition } from "./types/language";
+import { Worker } from "node:worker_threads";
 import type { Token } from "./types/token";
 import type { TokenizerOptions } from "./types/tokenizer";
 
@@ -51,10 +48,6 @@ interface PendingRequest {
 }
 
 const DEFAULT_TIMEOUT_MS = 5000;
-
-if (!isMainThread && parentPort) {
-  startWorker();
-}
 
 export class AsyncTokenizer {
   private readonly languageName: string;
@@ -152,7 +145,12 @@ export class AsyncTokenizer {
   private ensureWorker(): Worker {
     if (this.worker) return this.worker;
 
-    const worker = new Worker(__filename);
+    const worker = new Worker(require.resolve("./workerRuntime"), {
+      workerData: {
+        tokenizerPath: require.resolve("./core/Tokenizer"),
+        languagesPath: require.resolve("./languages/Languages"),
+      },
+    });
     this.worker = worker;
     worker.on("message", (response: WorkerResponse) => {
       const pending = this.pending.get(response.id);
@@ -200,60 +198,4 @@ export class AsyncTokenizer {
     }
     this.pending.clear();
   }
-}
-
-function startWorker(): void {
-  if (!parentPort) return;
-  const tokenizers = new Map<string, Tokenizer>();
-
-  parentPort.on("message", (request: WorkerRequest) => {
-    try {
-      const language = defaultRegistry.getLanguage(request.language);
-      if (!language) {
-        throw new Error(`Unsupported language: ${request.language}`);
-      }
-      const tokenizer = getWorkerTokenizer(
-        tokenizers,
-        language,
-        request.language,
-        request.options,
-      );
-      const result =
-        request.type === "tokenize"
-          ? tokenizer.tokenizeWithState(
-              request.code ?? "",
-              request.initialStateStack ?? ["root"],
-            )
-          : tokenizer.tokenizeLine(
-              request.line ?? "",
-              request.initialStateStack ?? ["root"],
-              request.lineIndex ?? 0,
-            );
-      parentPort?.postMessage({ id: request.id, ok: true, result });
-    } catch (error) {
-      parentPort?.postMessage({
-        id: request.id,
-        ok: false,
-        error: {
-          name: error instanceof Error ? error.name : "Error",
-          message: error instanceof Error ? error.message : String(error),
-        },
-      });
-    }
-  });
-}
-
-function getWorkerTokenizer(
-  tokenizers: Map<string, Tokenizer>,
-  language: LanguageDefinition,
-  languageName: string,
-  options: TokenizerOptions,
-): Tokenizer {
-  const key = `${languageName.toLowerCase()}:${JSON.stringify(options)}`;
-  let tokenizer = tokenizers.get(key);
-  if (!tokenizer) {
-    tokenizer = new Tokenizer(language, options);
-    tokenizers.set(key, tokenizer);
-  }
-  return tokenizer;
 }
