@@ -33,7 +33,8 @@ Although NSH is developed primarily for NCE, it is not coupled to NCE and can be
 - 🎨 HTML and semantic token output
 - 🌐 Browser, Node.js, and Electron support
 - 🔌 Optional WebSocket server
-- 🧩 Custom language definitions
+- 🧩 Custom language definitions with validation
+- 📝 JSX, TSX and Markdown definitions
 - 🎭 Built-in light and dark themes
 - 📦 CommonJS and ESM support
 - 🔎 Language detection by file extension
@@ -244,6 +245,45 @@ document.getLineCount();
 
 Range end indexes are exclusive.
 
+## Convergence and line-index sensitivity
+
+After an edit, NSH re-tokenizes forward and stops as soon as the cached line state
+is provably unchanged:
+
+- the line text is identical;
+- the incoming state stack is identical;
+- the resulting state stack is identical;
+- absolute line indexes are unchanged **when the language depends on them**.
+
+Rule `context` callbacks receive an absolute `lineIndex`. A language declares
+`lineIndexSensitive: false` only after verifying that all of its contexts ignore
+that argument. When the flag is omitted, NSH assumes sensitivity as soon as any
+rule declares a `context`. For sensitive languages (currently CSV), inserting or
+deleting lines disables suffix reuse and retokenizes to the end of the document;
+replacing lines without shifting indexes still converges normally.
+
+This is a correctness guarantee, not a heuristic: reusing tokens produced with a
+different absolute line index would be unsafe for rules such as CSV header
+detection.
+
+`updateLines()` validates that `insertedLines` is an array of single-line strings
+and reports `retokenizedLines: 0` for no-op or identical replacement edits.
+
+Internally only `stateAfter` is stored per line. `stateBefore` is derived from the
+previous line (or `["root"]` for the first line), which avoids duplicating every
+state stack while keeping the public `CachedLineState` shape unchanged.
+
+The line array remains contiguous. A local edit that changes states rebuilds the
+array of line references in O(N) pointer copies. Measured on the benchmark
+environment, this costs roughly 0.5–4 ms at 100,000 lines; an in-place `splice`
+implementation was not faster. NSH therefore keeps the simpler structure rather
+than introducing a block/chunk tree without a measured benefit.
+
+Token retrieval returns fresh token objects with current line numbers, so
+`getTokens()` and `getTokensForLines()` are O(number of returned tokens) and
+allocate. For editor refreshes, prefer `getLines()` or a narrow
+`getTokensForLines()` range over `getTokens()` on the full document.
+
 ---
 
 # Highlighting a single line
@@ -304,6 +344,8 @@ NSH currently includes the following built-in language definitions:
 | ---------- | -------------------------------------------- |
 | JavaScript | `.js`, `.mjs`                                |
 | TypeScript | `.ts`                                        |
+| JSX        | `.jsx`                                       |
+| TSX        | `.tsx`                                       |
 | Python     | `.py`, `.pyw`                                |
 | HTML       | `.html`, `.htm`                              |
 | CSS        | `.css`                                       |
@@ -315,10 +357,21 @@ NSH currently includes the following built-in language definitions:
 | C          | `.c`, `.h`                                   |
 | C++        | `.cpp`, `.cc`, `.cxx`, `.hpp`, `.hh`, `.hxx` |
 | CSV        | `.csv`                                       |
+| Markdown   | `.md`, `.markdown`                          |
 
 > YAML support is currently experimental.
 
-JSX/TSX and SCSS/Sass are not currently advertised as supported languages.
+JSX and TSX support tags, attributes, fragments, children, embedded expressions and
+nested JavaScript/TypeScript. Angle-bracket syntax remains lexically ambiguous in
+some TSX cases (notably generic arrow functions with constraints); NSH uses
+heuristics and documents the remaining limits below.
+
+Markdown supports headings, lists, blockquotes, separators, inline markup, links,
+images, tables, embedded HTML and fenced code blocks. Fenced code content is
+highlighted as a code block; it is not dispatched to the language named in the
+fence info string.
+
+SCSS/Sass are not currently supported.
 
 ---
 
@@ -450,6 +503,64 @@ context?: (
 ```
 
 This makes it possible to implement multiline constructs and lightweight context-sensitive highlighting without introducing a full parser.
+
+A language also declares whether its contexts depend on the absolute line index:
+
+```ts
+interface LanguageDefinition {
+  // ...
+  lineIndexSensitive?: boolean;
+}
+```
+
+When omitted, the tokenizer treats the language as line-index sensitive as soon as
+one rule declares `context`. Set it to `false` only after auditing every context,
+because incremental suffix reuse depends on this declaration.
+
+Context callbacks must be deterministic functions of the line, position, tokens,
+state stack and (when declared safe to ignore) the line index. They must not depend
+on mutable external state, otherwise incremental convergence cannot be guaranteed.
+
+## Definition validation
+
+The first tokenization compiles and validates the definition. Invalid definitions
+throw a `LanguageValidationError` whose message lists the concrete issues:
+
+- missing `root` state;
+- non-`RegExp` patterns;
+- pushes or `popTo` targets that reference unknown states;
+- empty-match rules without `pop`, `popTo` or `popPrefix` (these cannot make
+  progress);
+- states that are unreachable from `root` when all pushes are static;
+- unknown initial state names or dynamic push targets at runtime.
+
+An empty-match rule is allowed when it performs a state reduction, which is how
+languages implement zero-width state exits. The tokenizer also guarantees progress
+when a rule matches zero characters: it either changes state or advances one
+character.
+
+Validate a definition explicitly, for example in CI:
+
+```ts
+import { validateLanguageDefinition } from "nsh";
+
+const result = validateLanguageDefinition(new MyLanguage());
+
+console.log(result.errors);
+console.log(result.warnings);
+```
+
+`Tokenizer.getValidationWarnings()` exposes deferred warnings, including a
+conservative nested-quantifier heuristic for patterns such as `(a+)+`. Warnings do
+not reject a definition. JavaScript cannot interrupt a synchronous regular
+expression that is already backtracking, so NSH does not claim a runtime regex
+timeout; keep patterns bounded and prefer lexical states for complex syntax.
+
+Validation can be disabled for legacy definitions:
+
+```ts
+new Tokenizer(language, { validate: false });
+```
 
 Language definitions are treated as immutable after a tokenizer compiles them. If a definition is mutated in place, call `tokenizer.setLanguage(language)` or `tokenizer.clearCache()` before tokenizing again.
 
@@ -603,6 +714,8 @@ import {
   IncrementalDocument,
   Parser,
   LanguageRegistry,
+  validateLanguageDefinition,
+  LanguageValidationError,
 } from "nsh";
 ```
 
@@ -668,13 +781,24 @@ The tokenizer:
 
 - matches rules only at the current cursor position;
 - uses sticky regular expressions;
-- caches compiled language states;
+- caches compiled and validated language states;
 - avoids forward regex scanning;
+- runs context callbacks only after a cheap first-character guard;
+- bounds contextual lookahead (see the limits above);
 - skips whitespace runs when no rule can consume them;
 - bounds lexical state depth to prevent pathological memory growth;
 - carries lexical state between lines.
 
-`IncrementalDocument` additionally stops re-tokenization once the lexical state converges with the cached document state.
+`IncrementalDocument` additionally stops re-tokenization once the lexical state
+converges with the cached document state. Convergence is skipped when absolute
+line indexes shift for a line-index-sensitive language, so cached tokens are never
+reused across an unsafe index change.
+
+Rules are still tested in declaration order at each position. NSH did not add a
+first-character rule index: the benchmark suite shows contextual checks and token
+allocation dominating realistic workloads, and an index would risk changing rule
+priority semantics. Rules should therefore be ordered from most specific to most
+general.
 
 Run the benchmark suite with:
 
@@ -682,13 +806,117 @@ Run the benchmark suite with:
 npm run benchmark
 ```
 
-Run the lightweight benchmark used by CI:
+Run the correctness/performance smoke check:
 
 ```bash
 npm run benchmark:smoke
 ```
 
 Performance should always be measured on the application and files you intend to highlight.
+
+## Sample run
+
+The following sample was produced by `node --expose-gc benchmark/index.js` with
+`NSH_BENCH_SAMPLES=3` and one warmup, on Node v22.12.0, macOS x64, 4 CPUs
+(2026-11-08). Numbers are hardware- and content-dependent and are not contractual
+thresholds.
+
+Initial tokenization:
+
+| Language   | Lines  | Chars    | Tokens   | Median ms | p95 ms |
+| ---------- | ------ | -------- | -------- | --------- | ------ |
+| JavaScript | 1,000  | 25,749   | 7,250    | 28.67     | 86.59  |
+| JavaScript | 10,000 | 257,499  | 72,500   | 115.68    | 170.32 |
+| JavaScript | 50,000 | 1,287,499| 362,500  | 533.69    | 646.06 |
+| JavaScript | 100,000| 2,574,999| 725,000  | 1,026.28  | 1,411.70 |
+| TypeScript | 10,000 | 417,499  | 127,500  | 503.98    | 1,125.33 |
+| TypeScript | 100,000| 4,174,999| 1,275,000| 3,332.42  | 3,409.10 |
+| Python     | 10,000 | 174,999  | 60,000   | 156.22    | 160.64 |
+| HTML       | 10,000 | 279,999  | 75,000   | 88.39     | 93.07  |
+| CSS        | 10,000 | 349,999  | 110,000  | 328.90    | 737.40 |
+| JSON       | 10,000 | 429,999  | 130,000  | 120.65    | 126.59 |
+| Markdown   | 10,000 | 147,499  | 17,500   | 101.93    | 124.31 |
+
+Incremental updates on 100,000-line documents:
+
+| Language   | Edit          | Retokenized lines | Median ms | p95 ms |
+| ---------- | ------------- | ----------------- | --------- | ------ |
+| JavaScript | middle        | 2                 | 1.18      | 1.62   |
+| JavaScript | insert start  | 2                 | 0.95      | 1.43   |
+| JavaScript | insert end    | 1                 | 0.97      | 1.84   |
+| JavaScript | delete start  | 1                 | 0.92      | 0.93   |
+| JavaScript | multiline     | 50,000            | 78.98     | 90.10  |
+| TypeScript | middle        | 2                 | 0.87      | 1.38   |
+| TypeScript | insert start  | 2                 | 0.96      | 1.00   |
+| TypeScript | insert end    | 1                 | 0.94      | 0.95   |
+| TypeScript | delete start  | 1                 | 0.96      | 0.98   |
+| TypeScript | multiline     | 50,000            | 78.89     | 391.74 |
+
+Reads, HTML and long lines:
+
+| Metric                    | Size                | Median ms | p95 ms |
+| ------------------------- | ------------------- | --------- | ------ |
+| `getLine`                 | 100,000 lines       | 0.02      | 0.02   |
+| `getLines(100)`           | 100,000 lines       | 0.13      | 0.29   |
+| `getTokensForLines(100)`  | 100,000 lines       | 0.09      | 0.13   |
+| `getTokens()`             | 100,000 lines       | 137.53    | 148.55 |
+| `getHTML()`               | 10,000 lines        | 332.88    | 545.34 |
+| `highlight()`             | 10,000 lines        | 217.33    | 218.56 |
+| `getHTML()`               | 100,000 lines       | 2,668.82  | 3,591.79 |
+| TypeScript colons         | 120,000 characters  | 126.45    | 133.96 |
+| TypeScript generics       | 272,000 characters  | 124.95    | 131.29 |
+| Python annotations        | 96,000 characters   | 109.58    | 225.91 |
+| C++ angle brackets        | 105,000 characters  | 434.63    | 738.24 |
+| JavaScript symbols        | 500,000 characters  | 566.36    | 621.42 |
+| Minified JSON             | 500,000 characters  | 447.78    | 477.10 |
+| HTML text                 | 500,000 characters  | 0.51      | 0.54   |
+
+Document construction memory (JavaScript):
+
+| Lines   | Chars     | Tokens  | Heap delta | Bytes/char |
+| ------- | --------- | ------- | ---------- | ---------- |
+| 10,000  | 257,499   | 72,500  | 8.15 MiB   | 33.18      |
+| 50,000  | 1,287,499 | 362,500 | 31.95 MiB  | 26.02      |
+| 100,000 | 2,574,999 | 725,000 | 39.08 MiB  | 15.92      |
+
+## Memory retention
+
+An `IncrementalDocument` retains:
+
+- one string per source line;
+- its token objects;
+- one `stateAfter` stack per line (`stateBefore` is derived);
+- the tokenizer's compiled language states.
+
+There is no global document cache. Releasing the document releases its lines,
+tokens and states. The optional WebSocket server additionally bounds documents and
+characters per client.
+
+Storing `stateBefore` again was removed after measurement: for 100,000 unique
+JavaScript lines (2.58M characters, 500,000 tokens), heap usage after GC dropped
+from 71.20 MiB to 67.44 MiB (about 5%). Full token retrieval still allocates fresh
+token objects so callers cannot mutate the cache.
+
+## HTML generation
+
+`Highlighter.getHTML()` and `highlight()` emit one
+`<div class="nsh-line">...</div>` per source line. Line breaks are represented by
+those line elements; newline characters are not emitted as text between them.
+Spaces, tabs and all other characters inside a line are preserved exactly, and
+token values are HTML-escaped.
+
+Generating HTML for an entire document is O(source + tokens) and builds one large
+string. For a 100,000-line JavaScript document, the benchmark emits tens of
+megabytes of HTML. For editor refreshes, prefer:
+
+- `highlightLine()` / `getHTMLLine()` for visible lines with an externally managed
+  state;
+- `IncrementalDocument.getLines()` and the semantic tokens for the changed range;
+- full-document `getHTML()` only when the consumer actually needs the complete
+  string.
+
+The Highlighter is not a document renderer and does not perform syntax-aware range
+generation; range HTML is obtained by highlighting the relevant lines.
 
 ---
 
@@ -736,11 +964,16 @@ Type-check:
 npm run typecheck
 ```
 
-Run the test suite (includes packaging and browser-bundle checks):
+Run the test suite:
 
 ```bash
 npm test
 ```
+
+The suite covers tokenizer rules and validation, seeded differential tests that
+compare incremental tokenization against a full retokenization across languages,
+long-line regressions, Highlighter escaping/text preservation, the registry,
+the WebSocket server, browser bundling and npm packaging.
 
 Run only the packaging checks:
 
@@ -772,11 +1005,30 @@ Run benchmarks:
 npm run benchmark
 ```
 
+The benchmark performs a warmup, repeats measurements, and reports the median and
+p95. It covers initial tokenization, incremental edits at several document
+positions, token retrieval, HTML generation, long single lines and document
+memory. Use these environment variables to change the sampling:
+
+```bash
+NSH_BENCH_SAMPLES=5 NSH_BENCH_WARMUP=2 npm run benchmark
+```
+
+Memory measurement requires the `--expose-gc` flag, which the npm script already
+provides. Run the script directly if you need another invocation:
+
+```bash
+node --expose-gc benchmark/index.js
+```
+
 Run the benchmark smoke test:
 
 ```bash
 npm run benchmark:smoke
 ```
+
+The smoke test checks correctness and reports timings without imposing fixed
+performance thresholds.
 
 Inspect the npm package before publishing:
 
@@ -813,7 +1065,35 @@ Examples include:
 - CSV quoted fields spanning physical lines (tokens are line-based);
 - YAML block-scalar indentation beyond the supported heuristic;
 - complex nested language grammars;
-- advanced YAML indentation semantics.
+- advanced YAML indentation semantics;
+- TypeScript class-field annotations and some deeply nested type constructs;
+- JSX/TSX angle-bracket ambiguity between generics, type parameters and tags;
+- Markdown fenced code that is not re-tokenized with the language named in its info string;
+- Markdown headings, blockquotes and table headers are line-level constructs rather than nested inline parses;
+- JSX closing tags must terminate on the same physical line.
+
+Long-line guards are intentionally bounded rather than unlimited:
+
+- TypeScript generic lookahead is limited to 256 characters;
+- Java generic matching is limited to 256 characters inside the angle brackets;
+- C++ generic detection is limited to a 512-character window.
+
+Content beyond those windows is still tokenized, but it may be emitted as
+operators/identifiers instead of a single generic token. This keeps pathological
+single-line files linear and prevents full-line rescans on every rule check.
+
+Lexical state depth is capped by `maxStateDepth` (64 by default). Additional
+pushes beyond that depth are ignored rather than growing memory without bound.
+This is a documented safety degradation; increase the option if a language
+legitimately needs a deeper stack.
+
+NSH cannot interrupt a synchronous regular expression that has already entered
+catastrophic backtracking. Validation reports obvious nested quantifiers as
+warnings, but authors must keep regexes bounded and prefer lexical states for
+complex syntax. JavaScript provides no portable synchronous regex timeout.
+
+Full-document `getTokens()` and `getHTML()` are O(source + tokens) and allocate
+their outputs. For editor refreshes, use line or range APIs instead.
 
 NSH intentionally uses lightweight lexical heuristics rather than running a language compiler or AST parser.
 

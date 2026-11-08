@@ -3,7 +3,8 @@ const test = require("node:test");
 const { LanguageRegistry } = require("../dist/cjs/core/LanguageRegistry");
 const { Parser } = require("../dist/cjs/core/Parser");
 const { Highlighter } = require("../dist/cjs/core/Highlighter");
-const { defaultRegistry } = require("../dist/cjs/languages/Languages");
+const { defaultRegistry, languages } = require("../dist/cjs/languages/Languages");
+const { validateLanguageDefinition } = require("../dist/cjs/core/LanguageValidation");
 
 function customLanguage(name, extensions, aliases) {
   return {
@@ -50,6 +51,17 @@ test("built-in aliases and detection are available", () => {
   assert.equal(defaultRegistry.getLanguage("c++").name, "cpp");
   assert.equal(Highlighter.detectLanguage("ts"), "typescript");
   assert.equal(Highlighter.detectLanguage(".CSV"), "csv");
+  assert.equal(Highlighter.detectLanguage(".jsx"), "jsx");
+  assert.equal(Highlighter.detectLanguage(".tsx"), "tsx");
+  assert.equal(Highlighter.detectLanguage("md"), "markdown");
+});
+
+test("every built-in language definition validates without errors or warnings", () => {
+  for (const language of Object.values(languages)) {
+    const result = validateLanguageDefinition(language);
+    assert.deepEqual(result.errors, [], language.name);
+    assert.deepEqual(result.warnings, [], language.name);
+  }
 });
 
 test("Parser refreshes its source line count after setTokens", () => {

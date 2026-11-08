@@ -7,7 +7,16 @@ export interface CachedLineState {
   stateAfter: string[];
 }
 
-export interface InternalLineState extends CachedLineState {}
+/**
+ * Stored form of a line. `stateBefore` is always the previous line's
+ * `stateAfter` (or `["root"]` for the first line), so it is derived instead of
+ * being stored again.
+ */
+export interface InternalLineState {
+  text: string;
+  tokens: Token[];
+  stateAfter: string[];
+}
 
 export interface IncrementalUpdate {
   startLine: number;

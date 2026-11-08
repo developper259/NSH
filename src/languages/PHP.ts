@@ -321,10 +321,12 @@ const heredocPush: StatePushResolver = (
 
 function isHeredocTerminator(
   line: string,
-  _position: number,
+  position: number,
   _tokens: Token[],
   stateStack: string[],
 ): boolean {
+  if (position !== 0) return false;
+
   const currentState = stateStack[stateStack.length - 1];
   const separator = currentState.lastIndexOf(":");
   if (separator < 0) return false;
@@ -335,6 +337,7 @@ function isHeredocTerminator(
 export class PHP implements LanguageDefinition {
   name = "php";
   extensions = [".php", ".phtml", ".php3", ".php4", ".php5"];
+  lineIndexSensitive = false;
 
   private html = new HTML();
   private phpCode = new PHPCode();

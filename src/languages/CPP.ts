@@ -9,11 +9,13 @@ import {
   NUMBER_PATTERNS,
   COMMENT_PATTERNS,
 } from "./shared";
+import { lastSignificantToken } from "./context";
 
 export class CPP implements LanguageDefinition {
   name = "cpp";
   extensions = [".cpp", ".cc", ".cxx", ".hpp", ".hh", ".hxx", ".h++"];
   aliases = ["c++"];
+  lineIndexSensitive = false;
 
   private cppKeywords = [
     "alignas",
@@ -353,17 +355,30 @@ const rawStringPush: StatePushResolver = (
   return `inRawString:${encodeURIComponent(delimiter)}`;
 };
 
+const GENERIC_LOOKAHEAD = 512;
+const DECLARATION_SCAN_TOKENS = 64;
+const DECLARATION_KEYWORDS = new Set([
+  "class",
+  "struct",
+  "typename",
+  "using",
+  "typedef",
+]);
+
 function isRawStringTerminator(
   line: string,
   position: number,
   _tokens: Token[],
   stateStack: string[],
 ): boolean {
+  if (line[position] !== ")") return false;
+
   const currentState = stateStack[stateStack.length - 1];
   const separator = currentState.lastIndexOf(":");
   if (separator < 0) return false;
   const delimiter = decodeURIComponent(currentState.slice(separator + 1));
-  const match = /^\)([^()\\\s]{0,16})"/.exec(line.slice(position));
+  const window = line.slice(position, position + 24);
+  const match = /^\)([^()\\\s]{0,16})"/.exec(window);
   return match !== null && match[1] === delimiter;
 }
 
@@ -373,23 +388,39 @@ function isCppGeneric(
   tokens: Token[],
   _stateStack: string[],
 ): boolean {
-  const match = /^<[a-zA-Z0-9_,:\s<>\[\]*&]+>/.exec(line.slice(position));
+  if (line[position] !== "<") return false;
+
+  const snippet = line.slice(
+    position,
+    Math.min(line.length, position + GENERIC_LOOKAHEAD),
+  );
+  const match = /^<[a-zA-Z0-9_,:\s<>\[\]*&]+>/.exec(snippet);
   if (!match) return false;
 
   const content = match[0].slice(1, -1);
   if (/&&|\|\||==|!=|<=|>=|[=+\-/%!?]/.test(content)) return false;
   if (!/\s/.test(content)) return true;
 
-  let previous: Token | undefined;
-  for (let index = tokens.length - 1; index >= 0; index -= 1) {
-    if (tokens[index].type !== "comment") {
-      previous = tokens[index];
+  const previous = lastSignificantToken(tokens);
+  if (
+    previous?.token.value === "template" ||
+    previous?.token.type === "type"
+  ) {
+    return true;
+  }
+
+  for (
+    let index = tokens.length - 1, steps = 0;
+    index >= 0 && steps < DECLARATION_SCAN_TOKENS;
+    index -= 1, steps += 1
+  ) {
+    const token = tokens[index];
+    if (token.value === ";" || token.value === "{" || token.value === "}") {
       break;
     }
+    if (token.type === "keyword" && DECLARATION_KEYWORDS.has(token.value)) {
+      return true;
+    }
   }
-  if (previous?.value === "template" || previous?.type === "type") return true;
-
-  const prefix = line.slice(0, position).trimEnd();
-  if (/\b(?:class|struct|typename|using|typedef)\b/.test(prefix)) return true;
   return /[,:<>*&[\]]/.test(content);
 }

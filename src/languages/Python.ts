@@ -9,11 +9,13 @@ import {
   NUMBER_PATTERNS,
   COMMENT_PATTERNS,
 } from "./shared";
+import { enclosingBracket, lastSignificantToken } from "./context";
 
 export class Python implements LanguageDefinition {
   name = "python";
   extensions = [".py", ".pyw"];
   aliases = ["py"];
+  lineIndexSensitive = false;
 
   private pyKeywords = [
     "def",
@@ -292,23 +294,15 @@ export class Python implements LanguageDefinition {
 }
 
 function isTypeHintContext(
-  _line: string,
-  _position: number,
+  line: string,
+  position: number,
   tokens: Token[],
 ): boolean {
-  let variableIndex = tokens.length - 1;
-  while (variableIndex >= 0 && tokens[variableIndex].type === "comment") {
-    variableIndex -= 1;
-  }
-  if (variableIndex < 0 || tokens[variableIndex].type !== "variable") {
-    return false;
-  }
+  if (line[position] !== ":") return false;
 
-  for (let index = variableIndex - 1; index >= 0; index -= 1) {
-    const token = tokens[index];
-    if (token.type === "comment") continue;
-    if (token.value === "{") return false;
-    if (token.value === "(" || token.value === "[") return true;
-  }
-  return true;
+  const last = lastSignificantToken(tokens);
+  if (!last || last.token.type !== "variable") return false;
+
+  // Dictionary keys are not annotations. Parameter lists and subscripts are.
+  return enclosingBracket(tokens)?.kind !== "{";
 }

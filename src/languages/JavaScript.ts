@@ -234,11 +234,6 @@ export class JavaScript implements LanguageDefinition {
           className: "nsh-operator",
         },
         createVariableToken(),
-        {
-          name: "jsx-tag",
-          pattern: /<\/?[a-zA-Z][a-zA-Z0-9]*/g,
-          className: "nsh-keyword",
-        },
       ],
       inMultiLineComment: [
         {

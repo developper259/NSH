@@ -6,6 +6,9 @@ const { Parser } = require("../dist/cjs/core/Parser");
 
 const { JavaScript } = require("../dist/cjs/languages/JavaScript");
 const { TypeScript } = require("../dist/cjs/languages/TypeScript");
+const { JSX } = require("../dist/cjs/languages/JSX");
+const { TSX } = require("../dist/cjs/languages/TSX");
+const { Markdown } = require("../dist/cjs/languages/Markdown");
 const { Python } = require("../dist/cjs/languages/Python");
 const { HTML } = require("../dist/cjs/languages/HTML");
 const { CSS } = require("../dist/cjs/languages/CSS");
@@ -35,6 +38,9 @@ test("smoke: every registered language produces tokens on a simple example", () 
   const cases = [
     ["JavaScript", JavaScript, "const x = 1;"],
     ["TypeScript", TypeScript, "const x: number = 1;"],
+    ["JSX", JSX, "const x = <div className=\"a\">text</div>;"],
+    ["TSX", TSX, "const x = <div>{value as string}</div>;"],
+    ["Markdown", Markdown, "# Title\n\n**bold** and `code`"],
     ["Python", Python, "def f():\n    return 1"],
     ["HTML", HTML, '<div class="a">hi</div>'],
     ["CSS", CSS, "body { color: red; }"],
@@ -511,6 +517,36 @@ test("TypeScript method calls after dot are functions", () => {
   const tokens = tokensFor(TypeScript, "linesMap.has(token.line); linesMap.set(token.line, []); linesMap.get(token.line); array.push(token);");
   for (const value of ["has", "set", "get", "push"])
     assert.equal(tokens.find((token) => token.value === value).type, "function");
+});
+
+test("TypeScript arrow, destructured and modified parameters are typed", () => {
+  const arrow = tokensFor(
+    TypeScript,
+    "const f = (a: string, b?: number, { c }: Props): Result => a;",
+  );
+  for (const value of ["string", "number", "Props", "Result"]) {
+    assert.equal(arrow.find((token) => token.value === value).type, "type", value);
+  }
+
+  const constructor = tokensFor(
+    TypeScript,
+    "class A { constructor(private value: string, readonly count: number) {} }",
+  );
+  for (const value of ["value", "count"]) {
+    assert.equal(constructor.find((token) => token.value === value).type, "variable");
+  }
+  for (const value of ["string", "number"]) {
+    assert.equal(constructor.find((token) => token.value === value).type, "type");
+  }
+
+  const declaration = tokensFor(TypeScript, "const { a }: Props = value;");
+  assert.equal(declaration.find((token) => token.value === "Props").type, "type");
+
+  const ternary = tokensFor(
+    TypeScript,
+    "const value = (cond ? { a: 1 } : [b]);",
+  );
+  assert.equal(ternary.some((token) => token.type === "type-separator"), false);
 });
 
 test("TypeScript function parameters are variables", () => {

@@ -236,7 +236,8 @@ export class Java implements LanguageDefinition {
         createCommentToken(COMMENT_PATTERNS.singleLine.doubleSlash),
         {
           name: "generic",
-          pattern: /(?<=[a-zA-Z_$])<[a-zA-Z][a-zA-Z0-9_,\s<>\[\]?]*>/g,
+          pattern:
+            /(?<=[a-zA-Z_$])<[a-zA-Z][a-zA-Z0-9_,\s<>\[\]?]{0,256}>/g,
           className: "nsh-keyword",
         },
         createFunctionToken(),

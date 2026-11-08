@@ -3,9 +3,16 @@ export { IncrementalDocument } from './core/IncrementalDocument';
 export { Parser } from './core/Parser';
 export { Highlighter } from './core/Highlighter';
 export { LanguageRegistry, normalizeExtension } from './core/LanguageRegistry';
+export {
+  LanguageValidationError,
+  validateLanguageDefinition,
+} from './core/LanguageValidation';
 
 export { JavaScript } from './languages/JavaScript';
 export { TypeScript } from './languages/TypeScript';
+export { JSX } from './languages/JSX';
+export { TSX } from './languages/TSX';
+export { Markdown } from './languages/Markdown';
 export { Python } from './languages/Python';
 export { HTML } from './languages/HTML';
 export { CSS } from './languages/CSS';
@@ -22,6 +29,7 @@ export type { Token, TokenType, StatePushResolver } from './types/token';
 export type { CachedLineState, IncrementalUpdate } from './types/incremental';
 export type { ParsedCode, ParsedLine } from './types/parser';
 export type { TokenizerOptions } from './types/tokenizer';
+export type { LanguageValidationResult } from './core/LanguageValidation';
 export type { LanguageDefinition } from './types/language';
 export type { HighlightOptions, HighlightResult, LineHighlightResult } from './types/highlighter';
 export type {

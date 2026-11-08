@@ -39,7 +39,7 @@
     "typecheck": "tsc --noEmit",
     "test": "npm run build && node scripts/run-tests.js",
     "test:package": "npm run build && node test/package.test.js",
-    "benchmark": "npm run build && node benchmark/index.js",
+    "benchmark": "npm run build && node --expose-gc benchmark/index.js",
     "benchmark:smoke": "npm run build && node benchmark/smoke.js",
     "prepare": "node scripts/prepare.js",
     "dev": "tsc --watch",

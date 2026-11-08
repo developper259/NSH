@@ -7,6 +7,11 @@ import {
   TokenContext,
   TokenizerOptions,
 } from "../types/tokenizer";
+import {
+  LanguageValidationError,
+  resolveBaseStateName,
+  validateStates,
+} from "./LanguageValidation";
 
 const DEFAULT_MAX_STATE_DEPTH = 64;
 const DEFAULT_STATE = ["root"];
@@ -27,7 +32,11 @@ const COMMENT_TOKEN_TYPES = new Set(["comment", "jsdoc", "docstring"]);
 export class Tokenizer {
   private language: LanguageDefinition;
   private states: Record<string, CompiledState> | null = null;
+  private knownStates: Set<string> | null = null;
+  private lineIndexSensitive = false;
+  private validationWarnings: string[] = [];
   private readonly maxStateDepth: number;
+  private readonly validationEnabled: boolean;
 
   constructor(language: LanguageDefinition, options: TokenizerOptions = {}) {
     const maxStateDepth = options.maxStateDepth ?? DEFAULT_MAX_STATE_DEPTH;
@@ -36,10 +45,21 @@ export class Tokenizer {
     }
     this.language = language;
     this.maxStateDepth = maxStateDepth;
+    this.validationEnabled = options.validate ?? true;
   }
 
   public getMaxStateDepth(): number {
     return this.maxStateDepth;
+  }
+
+  public isLineIndexSensitive(): boolean {
+    this.getCompiledStates();
+    return this.lineIndexSensitive;
+  }
+
+  public getValidationWarnings(): string[] {
+    this.getCompiledStates();
+    return [...this.validationWarnings];
   }
 
   public tokenize(code: string): Token[] {
@@ -175,10 +195,16 @@ export class Tokenizer {
   public setLanguage(language: LanguageDefinition): void {
     this.language = language;
     this.states = null;
+    this.knownStates = null;
+    this.lineIndexSensitive = false;
+    this.validationWarnings = [];
   }
 
   public clearCache(): void {
     this.states = null;
+    this.knownStates = null;
+    this.lineIndexSensitive = false;
+    this.validationWarnings = [];
   }
 
   private applyStateTransitions(
@@ -214,8 +240,11 @@ export class Tokenizer {
         typeof rule.push === "function"
           ? rule.push(line, position, tokens, stateStack, matched)
           : rule.push;
-      if (pushed && stateStack.length < this.maxStateDepth) {
-        stateStack.push(pushed);
+      if (pushed) {
+        this.assertKnownState(pushed, rule.name);
+        if (stateStack.length < this.maxStateDepth) {
+          stateStack.push(pushed);
+        }
       }
     }
 
@@ -226,10 +255,32 @@ export class Tokenizer {
     if (!initialStateStack || initialStateStack.length === 0) {
       return [...DEFAULT_STATE];
     }
-    if (initialStateStack.length <= this.maxStateDepth) {
-      return [...initialStateStack];
+    const stateStack =
+      initialStateStack.length <= this.maxStateDepth
+        ? [...initialStateStack]
+        : initialStateStack.slice(0, this.maxStateDepth);
+    if (this.validationEnabled) {
+      for (const stateName of stateStack) {
+        this.assertKnownState(stateName, "initialState");
+      }
     }
-    return initialStateStack.slice(0, this.maxStateDepth);
+    return stateStack;
+  }
+
+  private assertKnownState(stateName: string, ruleName: string): void {
+    if (!this.validationEnabled) return;
+    const states = this.getCompiledStates();
+    if (!this.knownStates) {
+      this.knownStates = new Set(Object.keys(states));
+    }
+    if (
+      !this.knownStates.has(stateName) &&
+      !this.knownStates.has(resolveBaseStateName(stateName))
+    ) {
+      throw new LanguageValidationError(this.language.name, [
+        `rule "${ruleName}" references unknown state "${stateName}"`,
+      ]);
+    }
   }
 
   private getCompiledStates(): Record<string, CompiledState> {
@@ -238,27 +289,44 @@ export class Tokenizer {
     }
 
     const rawStates = this.language.getStates();
-    this.states = Object.fromEntries(
-      Object.entries(rawStates).map(([stateName, rules]) => {
-        const compiledRules = rules.map((original) => ({
-          original,
-          matcher: toStickyRegExp(original.pattern),
-        }));
-        return [
-          stateName,
-          {
-            rules: compiledRules,
-            canSkipWhitespace: !compiledRules.some((rule) =>
-              WHITESPACE_SAMPLES.some((sample) => {
-                rule.matcher.lastIndex = 0;
-                const match = rule.matcher.exec(sample);
-                return match !== null && match[0].length > 0;
-              }),
-            ),
-          },
-        ];
-      }),
-    );
+    const validation = validateStates(rawStates);
+    this.validationWarnings = validation.warnings;
+    if (this.validationEnabled && validation.errors.length > 0) {
+      throw new LanguageValidationError(this.language.name, validation.errors);
+    }
+
+    let hasContextRules = false;
+    const compiledStates: Record<string, CompiledState> = {};
+    for (const [stateName, rules] of Object.entries(rawStates)) {
+      const compiledRules = rules.map((original, ruleIndex) => {
+        if (original.context) hasContextRules = true;
+        let matcher: RegExp;
+        try {
+          matcher = toStickyRegExp(original.pattern);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          throw new LanguageValidationError(this.language.name, [
+            `state "${stateName}" rule ${ruleIndex} has an invalid pattern: ${message}`,
+          ]);
+        }
+        return { original, matcher };
+      });
+      compiledStates[stateName] = {
+        rules: compiledRules,
+        canSkipWhitespace: !compiledRules.some((rule) =>
+          WHITESPACE_SAMPLES.some((sample) => {
+            rule.matcher.lastIndex = 0;
+            const match = rule.matcher.exec(sample);
+            return match !== null && match[0].length > 0;
+          }),
+        ),
+      };
+    }
+
+    this.states = compiledStates;
+    this.knownStates = null;
+    this.lineIndexSensitive =
+      this.language.lineIndexSensitive ?? hasContextRules;
 
     return this.states;
   }

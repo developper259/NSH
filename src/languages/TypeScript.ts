@@ -12,11 +12,38 @@ import {
   COMMENT_PATTERNS,
   REGEX_PATTERN,
 } from "./shared";
+import {
+  enclosingBracket,
+  lastSignificantToken,
+  previousSignificantIndex,
+} from "./context";
+
+const GENERIC_LOOKAHEAD = 256;
+const MAX_GENERIC_TOKENS = 128;
+const ROOT_LIKE_STATES = new Set(["root", "jsxExpression"]);
+const ROOT_TYPE_PREFIXES = new Set([
+  "interface",
+  "class",
+  "extends",
+  "implements",
+  "as",
+  "satisfies",
+]);
+const DECLARATION_KEYWORDS = new Set(["function", "class", "interface", "type"]);
+const PARAMETER_MODIFIERS = new Set([
+  "public",
+  "private",
+  "protected",
+  "readonly",
+  "override",
+]);
 
 export class TypeScript implements LanguageDefinition {
   name = "typescript";
   extensions = [".ts"];
   aliases = ["ts"];
+  // All contexts below inspect the current line, tokens, or lexical state only.
+  lineIndexSensitive = false;
 
   private tsKeywords = [
     "var",
@@ -302,11 +329,6 @@ export class TypeScript implements LanguageDefinition {
         },
         { name: "non-null", pattern: /!(?![=])/g, className: "nsh-operator" },
         createVariableToken(),
-        {
-          name: "jsx-tag",
-          pattern: /<\/?[a-zA-Z][a-zA-Z0-9]*/g,
-          className: "nsh-keyword",
-        },
       ],
       inType: [
         {
@@ -551,34 +573,80 @@ function isTypeAnnotationStart(
   tokens: Token[],
   stateStack: string[],
 ): boolean {
-  if (stateStack[stateStack.length - 1] !== "root") return false;
+  if (line[position] !== ":" || !isRootLikeState(stateStack)) return false;
 
-  const prefix = line.slice(0, position).trimEnd();
-  if (/(?:const|let|var)\s+[A-Za-z_$][A-Za-z0-9_$]*$/.test(prefix)) return true;
-  if (/(?:function\s+[A-Za-z_$][A-Za-z0-9_$]*(?:\s*<[^>]*>)?\s*\([^)]*|\)\s*)$/.test(prefix)) return true;
-  return Boolean(tokens.length && tokens[tokens.length - 1].value === ")");
+  const last = lastSignificantToken(tokens);
+  if (!last) return false;
+
+  if (last.token.type === "variable") {
+    const previousIndex = previousSignificantIndex(tokens, last.index);
+    const previous = previousIndex >= 0 ? tokens[previousIndex] : undefined;
+    return (
+      previous?.type === "keyword" &&
+      (previous.value === "const" || previous.value === "let" || previous.value === "var")
+    );
+  }
+
+  if (
+    last.token.type === "bracket" &&
+    (last.token.value === "}" || last.token.value === "]")
+  ) {
+    const openerIndex = findMatchingOpenerIndex(tokens, last.index);
+    if (openerIndex < 0) return false;
+    const keywordIndex = previousSignificantIndex(tokens, openerIndex);
+    const keyword = keywordIndex >= 0 ? tokens[keywordIndex] : undefined;
+    return (
+      keyword?.type === "keyword" &&
+      (keyword.value === "const" || keyword.value === "let" || keyword.value === "var")
+    );
+  }
+
+  return false;
 }
 
 function isReturnTypeStart(
   line: string,
   position: number,
-  _tokens: Token[],
+  tokens: Token[],
   stateStack: string[],
 ): boolean {
-  if (stateStack[stateStack.length - 1] !== "root") return false;
-  return /\)\s*$/.test(line.slice(0, position));
+  if (line[position] !== ":" || !isRootLikeState(stateStack)) return false;
+  return lastSignificantToken(tokens)?.token.value === ")";
 }
 
 function isParameterTypeStart(
   line: string,
   position: number,
-  _tokens: Token[],
+  tokens: Token[],
   stateStack: string[],
 ): boolean {
-  if (stateStack[stateStack.length - 1] !== "root") return false;
-  return /\b[A-Za-z_$][A-Za-z0-9_$]*\s*\([^{}]*[A-Za-z_$][A-Za-z0-9_$]*\??\s*$/.test(
-    line.slice(0, position),
-  );
+  if (line[position] !== ":" || !isRootLikeState(stateStack)) return false;
+
+  const last = lastSignificantToken(tokens);
+  if (!last) return false;
+
+  const frame = enclosingBracket(tokens);
+  if (!frame || frame.kind !== "(") return false;
+
+  if (
+    last.token.type === "bracket" &&
+    (last.token.value === "}" || last.token.value === "]")
+  ) {
+    const openerIndex = findMatchingOpenerIndex(tokens, last.index);
+    return openerIndex >= 0 && isAfterParameterSeparator(tokens, openerIndex);
+  }
+  if (isOptionalParameterMarker(tokens, last.index)) return true;
+  if (last.token.type !== "variable") return false;
+
+  const previousIndex = previousSignificantIndex(tokens, last.index);
+  const previous = previousIndex >= 0 ? tokens[previousIndex] : undefined;
+  if (
+    previous?.type === "keyword" &&
+    PARAMETER_MODIFIERS.has(previous.value)
+  ) {
+    return isAfterParameterSeparator(tokens, previousIndex);
+  }
+  return isAfterParameterSeparator(tokens, last.index);
 }
 
 function isRootTypeReference(
@@ -587,18 +655,19 @@ function isRootTypeReference(
   tokens: Token[],
   stateStack: string[],
 ): boolean {
-  if (stateStack[stateStack.length - 1] !== "root") return false;
-  const previous = tokens[tokens.length - 1]?.value;
-  const prefix = line.slice(0, position).trimEnd();
-  const suffix = line.slice(position);
-  return (
-    previous === "new" ||
-    previous === "<" ||
-    previous === "," ||
-    /\b(?:interface|class|extends|implements)\s*$/.test(prefix) ||
-    /^\s*</.test(suffix) ||
-    /^[A-Za-z_$][A-Za-z0-9_$]*\s*</.test(suffix)
-  );
+  if (!isTypeNameStart(line.charCodeAt(position)) || !isRootLikeState(stateStack)) {
+    return false;
+  }
+
+  const previous = tokens[tokens.length - 1];
+  if (previous) {
+    if (previous.value === "new" || previous.value === ",") return true;
+    if (previous.type === "keyword" && ROOT_TYPE_PREFIXES.has(previous.value)) {
+      return true;
+    }
+    if (previous.value === "<" && previous.type === "type-separator") return true;
+  }
+  return isFollowedByGenericArguments(line, position);
 }
 
 function shouldEndTypeAtLineStart(
@@ -625,22 +694,21 @@ function shouldEndTypeAtLineStart(
 }
 
 function isReturnTypeObjectStart(
-  _line: string,
-  _position: number,
+  line: string,
+  position: number,
   tokens: Token[],
   stateStack: string[],
 ): boolean {
-  if (stateStack[stateStack.length - 1] !== "inReturnType") return false;
-
-  let lastToken: Token | undefined;
-  for (let index = tokens.length - 1; index >= 0; index -= 1) {
-    if (tokens[index].type !== "comment") {
-      lastToken = tokens[index];
-      break;
-    }
+  if (
+    line[position] !== "{" ||
+    stateStack[stateStack.length - 1] !== "inReturnType"
+  ) {
+    return false;
   }
-  if (!lastToken) return true;
-  return [":", "|", "&", "<", ","].includes(lastToken.value);
+
+  const last = lastSignificantToken(tokens);
+  if (!last) return true;
+  return [":", "|", "&", "<", ","].includes(last.token.value);
 }
 
 function isAfterDot(
@@ -658,38 +726,165 @@ function isGenericStart(
   tokens: Token[],
   stateStack: string[],
 ): boolean {
-  if (stateStack[stateStack.length - 1] !== "root") return false;
+  if (line[position] !== "<" || !isRootLikeState(stateStack)) return false;
 
-  const prefix = line.slice(0, position).trimEnd();
-  if (/^<\s*[A-Za-z_$][A-Za-z0-9_$]*(?:\s*,[^>]*)?\s*>\s*\(/.test(line.slice(position))) {
+  const snippet = line.slice(
+    position,
+    Math.min(line.length, position + GENERIC_LOOKAHEAD),
+  );
+  if (/^<\s*[A-Za-z_$][A-Za-z0-9_$]*(?:\s*,[^>]*)?\s*>\s*\(/.test(snippet)) {
     return true;
   }
+
+  const previous = tokens[tokens.length - 1];
+  if (previous?.type === "type") return true;
+  const beforePrevious = tokens[tokens.length - 2];
   return (
-    /\b(?:function|class|interface|type)\s+[A-Za-z_$][A-Za-z0-9_$]*$/.test(prefix) ||
-    tokens[tokens.length - 1]?.type === "type"
+    previous?.type === "variable" &&
+    beforePrevious?.type === "keyword" &&
+    DECLARATION_KEYWORDS.has(beforePrevious.value)
   );
 }
 
 function isTypeAliasEquals(
   line: string,
   position: number,
-  _tokens: Token[],
+  tokens: Token[],
   stateStack: string[],
 ): boolean {
-  if (stateStack[stateStack.length - 1] !== "root") return false;
-  return /\btype\s+[A-Za-z_$][A-Za-z0-9_$]*(?:\s*<[^>]*>)?\s*$/.test(
-    line.slice(0, position),
+  return (
+    line[position] === "=" &&
+    isRootLikeState(stateStack) &&
+    isKeywordBeforeNameChain(tokens, "type")
   );
 }
 
 function isInterfaceBodyStart(
   line: string,
   position: number,
-  _tokens: Token[],
+  tokens: Token[],
   stateStack: string[],
 ): boolean {
-  if (stateStack[stateStack.length - 1] !== "root") return false;
-  return /\binterface\s+[A-Za-z_$][A-Za-z0-9_$]*(?:\s*<[^>]*>)?\s*$/.test(
-    line.slice(0, position),
+  return (
+    line[position] === "{" &&
+    isRootLikeState(stateStack) &&
+    isKeywordBeforeNameChain(tokens, "interface")
+  );
+}
+
+function isRootLikeState(stateStack: string[]): boolean {
+  return ROOT_LIKE_STATES.has(stateStack[stateStack.length - 1]);
+}
+
+function isOptionalParameterMarker(tokens: Token[], markerIndex: number): boolean {
+  if (tokens[markerIndex]?.value !== "?") return false;
+
+  const variableIndex = previousSignificantIndex(tokens, markerIndex);
+  const variable = tokens[variableIndex];
+  if (variable?.type !== "variable") return false;
+
+  const previousIndex = previousSignificantIndex(tokens, variableIndex);
+  const previous = previousIndex >= 0 ? tokens[previousIndex] : undefined;
+  if (previous?.type === "keyword" && PARAMETER_MODIFIERS.has(previous.value)) {
+    return isAfterParameterSeparator(tokens, previousIndex);
+  }
+  return isAfterParameterSeparator(tokens, variableIndex);
+}
+
+function isAfterParameterSeparator(tokens: Token[], index: number): boolean {
+  const previousIndex = previousSignificantIndex(tokens, index);
+  const previous = previousIndex >= 0 ? tokens[previousIndex] : undefined;
+  return (
+    (previous?.type === "bracket" &&
+      (previous.value === "(" || previous.value === "[")) ||
+    previous?.value === "," ||
+    previous?.value === "..." ||
+    previous?.type === "spread"
+  );
+}
+
+function findMatchingOpenerIndex(tokens: Token[], closeIndex: number): number {
+  const close = tokens[closeIndex];
+  if (!close) return -1;
+  const open = close.value === "}" ? "{" : "[";
+  let depth = 0;
+  for (let index = closeIndex; index >= 0; index -= 1) {
+    const token = tokens[index];
+    if (token.type !== "bracket") continue;
+    if (token.value === close.value) {
+      depth += 1;
+    } else if (token.value === open) {
+      depth -= 1;
+      if (depth === 0) return index;
+    }
+  }
+  return -1;
+}
+
+function skipTypeArgumentsBackward(tokens: Token[], closeIndex: number): number {
+  let depth = 1;
+  for (
+    let index = closeIndex - 1, steps = 0;
+    index >= 0 && steps < MAX_GENERIC_TOKENS;
+    index -= 1, steps += 1
+  ) {
+    const token = tokens[index];
+    if (token.type !== "type-separator") continue;
+    if (token.value === ">") {
+      depth += 1;
+    } else if (token.value === "<") {
+      depth -= 1;
+      if (depth === 0) {
+        return previousSignificantIndex(tokens, index);
+      }
+    }
+  }
+  return -1;
+}
+
+function isKeywordBeforeNameChain(tokens: Token[], keyword: string): boolean {
+  let index = tokens.length - 1;
+  if (tokens[index]?.value === ">" && tokens[index].type === "type-separator") {
+    index = skipTypeArgumentsBackward(tokens, index);
+    if (index < 0) return false;
+  }
+
+  const name = tokens[index];
+  if (!name || (name.type !== "variable" && name.type !== "type")) {
+    return false;
+  }
+
+  const previousIndex = previousSignificantIndex(tokens, index);
+  const previous = previousIndex >= 0 ? tokens[previousIndex] : undefined;
+  return previous?.type === "keyword" && previous.value === keyword;
+}
+
+function isFollowedByGenericArguments(line: string, position: number): boolean {
+  let index = position;
+  while (index < line.length && isIdentifierCharacter(line.charCodeAt(index))) {
+    index += 1;
+  }
+  while (index < line.length && (line[index] === " " || line[index] === "\t")) {
+    index += 1;
+  }
+  return line[index] === "<";
+}
+
+function isIdentifierCharacter(code: number): boolean {
+  return (
+    (code >= 65 && code <= 90) ||
+    (code >= 97 && code <= 122) ||
+    (code >= 48 && code <= 57) ||
+    code === 95 ||
+    code === 36
+  );
+}
+
+function isTypeNameStart(code: number): boolean {
+  return (
+    (code >= 65 && code <= 90) ||
+    (code >= 97 && code <= 122) ||
+    code === 95 ||
+    code === 36
   );
 }

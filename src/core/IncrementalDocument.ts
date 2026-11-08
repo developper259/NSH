@@ -6,6 +6,8 @@ import {
 } from "../types/incremental";
 import { Token } from "../types/token";
 
+const ROOT_STATE = ["root"];
+
 export class IncrementalDocument {
   private readonly tokenizer: Tokenizer;
   private lines: InternalLineState[] = [];
@@ -20,12 +22,16 @@ export class IncrementalDocument {
   }
 
   public setText(text: string): void {
-    const sourceLines = text.split("\n");
-    this.lines = this.buildLines(sourceLines, ["root"]);
+    this.lines = this.buildLines(text.split("\n"));
   }
 
   public getText(): string {
-    return this.lines.map((line) => line.text).join("\n");
+    let text = "";
+    for (let index = 0; index < this.lines.length; index += 1) {
+      if (index > 0) text += "\n";
+      text += this.lines[index].text;
+    }
+    return text;
   }
 
   public getTokens(): Token[] {
@@ -74,28 +80,28 @@ export class IncrementalDocument {
     if (deletedLines > this.lines.length - startLine) {
       throw new RangeError("deletedLines exceeds the document length");
     }
+    validateInsertedLines(insertedLines);
+
+    if (deletedLines === 0 && insertedLines.length === 0) {
+      return emptyUpdate(startLine);
+    }
 
     if (
       deletedLines === insertedLines.length &&
       insertedLines.length > 0 &&
       insertedLines.every((text, slot) => this.lines[startLine + slot].text === text)
     ) {
-      const before = startLine === 0 ? ["root"] : this.lines[startLine - 1].stateAfter;
-      const afterStart = this.lines[startLine].stateBefore;
-      const statesMatch = sameState(before, afterStart);
-      if (statesMatch) {
-        return {
-          startLine,
-          deletedLines,
-          insertedLines: insertedLines.length,
-          retokenizedLines: 0,
-          changedStartLine: startLine,
-          changedEndLine: startLine,
-        };
-      }
+      return {
+        startLine,
+        deletedLines,
+        insertedLines: insertedLines.length,
+        retokenizedLines: 0,
+        changedStartLine: startLine,
+        changedEndLine: startLine,
+      };
     }
 
-    const stateBefore = startLine === 0 ? ["root"] : this.lines[startLine - 1].stateAfter;
+    const stateBefore = this.stateBefore(startLine);
     const replacement: InternalLineState[] = [];
     let retokenizedLines = 0;
     let state = [...stateBefore];
@@ -108,7 +114,6 @@ export class IncrementalDocument {
       replacement.push({
         text: lineText,
         tokens: result.tokens,
-        stateBefore: [...state],
         stateAfter: [...result.finalStateStack],
       });
       retokenizedLines += 1;
@@ -116,6 +121,7 @@ export class IncrementalDocument {
       changedEndLine = newIndex + 1;
     }
 
+    const lineIndexSensitive = this.tokenizer.isLineIndexSensitive();
     const oldLineCount = this.lines.length;
     let newWriteIndex = startLine + insertedLines.length;
     let resumeOldIndex = startLine + deletedLines;
@@ -125,49 +131,32 @@ export class IncrementalDocument {
       resumeOldIndex += 1, newWriteIndex += 1
     ) {
       const oldLine = this.lines[resumeOldIndex];
-      const lineText = oldLine.text;
-
-      const result = this.tokenizer.tokenizeLine(lineText, state, newWriteIndex);
-      const entry: InternalLineState = {
-        text: lineText,
-        tokens: result.tokens,
-        stateBefore: [...state],
-        stateAfter: [...result.finalStateStack],
-      };
+      const oldStateBefore = this.stateBefore(resumeOldIndex);
+      const result = this.tokenizer.tokenizeLine(oldLine.text, state, newWriteIndex);
       retokenizedLines += 1;
-      state = result.finalStateStack;
 
-      if (
-        oldLine.text === lineText &&
-        sameState(oldLine.stateBefore, entry.stateBefore) &&
-        sameState(oldLine.stateAfter, entry.stateAfter)
-      ) {
+      const statesMatch =
+        sameState(oldStateBefore, state) &&
+        sameState(oldLine.stateAfter, result.finalStateStack);
+      const indexesMatch = !lineIndexSensitive || newWriteIndex === resumeOldIndex;
+      const changedEndIndex = newWriteIndex + 1;
+
+      if (statesMatch && indexesMatch) {
         changedEndLine = newWriteIndex;
         break;
       }
 
-      replacement.push(entry);
-      changedEndLine = newWriteIndex + 1;
+      replacement.push({
+        text: oldLine.text,
+        tokens: result.tokens,
+        stateAfter: [...result.finalStateStack],
+      });
+      state = result.finalStateStack;
+      changedEndLine = changedEndIndex;
     }
 
     if (replacement.length > 0 || deletedLines > 0) {
-      const nextLineCount = oldLineCount - deletedLines + insertedLines.length;
-      const nextLines: InternalLineState[] = new Array(nextLineCount);
-
-      for (let i = 0; i < startLine; i += 1) {
-        nextLines[i] = this.lines[i];
-      }
-      for (let i = 0; i < replacement.length; i += 1) {
-        nextLines[startLine + i] = replacement[i];
-      }
-      
-      const afterSource = resumeOldIndex;
-      const afterTarget = startLine + replacement.length;
-      for (let i = afterSource; i < this.lines.length; i += 1) {
-        nextLines[afterTarget + (i - afterSource)] = this.lines[i];
-      }
-
-      this.lines = nextLines;
+      this.lines = this.rebuildLines(startLine, replacement, resumeOldIndex);
     }
 
     return {
@@ -180,15 +169,18 @@ export class IncrementalDocument {
     };
   }
 
-  private buildLines(texts: string[], state: string[]): InternalLineState[] {
+  private stateBefore(lineIndex: number): string[] {
+    return lineIndex === 0 ? ROOT_STATE : this.lines[lineIndex - 1].stateAfter;
+  }
+
+  private buildLines(texts: string[]): InternalLineState[] {
     const result: InternalLineState[] = [];
-    let currentState = [...state];
+    let currentState = [...ROOT_STATE];
     for (let index = 0; index < texts.length; index += 1) {
       const tokenized = this.tokenizer.tokenizeLine(texts[index], currentState, index);
       result.push({
         text: texts[index],
         tokens: tokenized.tokens,
-        stateBefore: [...currentState],
         stateAfter: [...tokenized.finalStateStack],
       });
       currentState = tokenized.finalStateStack;
@@ -196,18 +188,64 @@ export class IncrementalDocument {
     return result;
   }
 
+  private rebuildLines(
+    startLine: number,
+    replacement: InternalLineState[],
+    resumeOldIndex: number,
+  ): InternalLineState[] {
+    const nextLineCount =
+      startLine + replacement.length + (this.lines.length - resumeOldIndex);
+    const nextLines: InternalLineState[] = new Array(nextLineCount);
+
+    for (let index = 0; index < startLine; index += 1) {
+      nextLines[index] = this.lines[index];
+    }
+    for (let index = 0; index < replacement.length; index += 1) {
+      nextLines[startLine + index] = replacement[index];
+    }
+
+    const afterTarget = startLine + replacement.length;
+    for (let index = resumeOldIndex; index < this.lines.length; index += 1) {
+      nextLines[afterTarget + (index - resumeOldIndex)] = this.lines[index];
+    }
+
+    return nextLines;
+  }
+
   private toCachedLine(line: InternalLineState, lineIndex: number): CachedLineState {
     return {
       text: line.text,
-      stateBefore: [...line.stateBefore],
+      stateBefore: [...this.stateBefore(lineIndex)],
       stateAfter: [...line.stateAfter],
       tokens: line.tokens.map((token) => ({ ...token, line: lineIndex + 1 })),
     };
   }
 }
 
+function emptyUpdate(line: number): IncrementalUpdate {
+  return {
+    startLine: line,
+    deletedLines: 0,
+    insertedLines: 0,
+    retokenizedLines: 0,
+    changedStartLine: line,
+    changedEndLine: line,
+  };
+}
+
 function sameState(left: string[], right: string[]): boolean {
   return left.length === right.length && left.every((value, index) => value === right[index]);
+}
+
+function validateInsertedLines(insertedLines: string[]): void {
+  if (!Array.isArray(insertedLines)) {
+    throw new TypeError("insertedLines must be an array of single-line strings");
+  }
+  for (const line of insertedLines) {
+    if (typeof line !== "string" || line.includes("\n")) {
+      throw new TypeError("insertedLines must contain single-line strings");
+    }
+  }
 }
 
 function validateRange(start: number, end: number, length: number): void {

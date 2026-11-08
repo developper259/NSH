@@ -41,6 +41,12 @@ const CLASS_MAP: Readonly<Record<string, string>> = {
   "object-operator": "nsh-operator", "scope-resolution": "nsh-operator",
   "namespace-separator": "nsh-operator", "class-name": "nsh-variable",
   "xml-decl": "nsh-keyword",
+  heading: "nsh-keyword", separator: "nsh-operator", blockquote: "nsh-comment",
+  "list-marker": "nsh-operator", "table-separator": "nsh-operator",
+  "table-delimiter": "nsh-operator", "inline-code": "nsh-string",
+  "code-block": "nsh-string", "code-fence": "nsh-string",
+  "code-fence-end": "nsh-string", bold: "nsh-keyword", italic: "nsh-type",
+  link: "nsh-function", image: "nsh-function", escape: "nsh-operator",
 };
 
 const HTML_ESCAPES: Readonly<Record<string, string>> = {

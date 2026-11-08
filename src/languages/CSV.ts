@@ -9,6 +9,8 @@ const CSV_NUMBER =
 export class CSV implements LanguageDefinition {
   name = "csv";
   extensions = [".csv"];
+  // Header detection intentionally depends on the absolute line index.
+  lineIndexSensitive = true;
 
   private readonly rootRules: TokenType[] = [
     {

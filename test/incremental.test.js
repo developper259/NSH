@@ -46,6 +46,40 @@ test("provides targeted line and token range reads", () => {
   assert.equal(document.getTokensForLines(2, 3)[0].line, 3);
 });
 
+test("character edits at the start, middle and end match full tokenization", () => {
+  const lines = Array.from({ length: 8 }, (_, index) => `const value${index} = ${index};`);
+  const document = new IncrementalDocument(new Tokenizer(new JavaScript()), lines.join("\n"));
+
+  for (const index of [0, 4, 7]) {
+    lines[index] = lines[index].replace("const", "const renamed");
+    document.updateLines(index, 1, [lines[index]]);
+    assert.deepEqual(
+      document.getTokens(),
+      new Tokenizer(new JavaScript()).tokenizeWithState(lines.join("\n")).tokens,
+      `line ${index}`,
+    );
+  }
+});
+
+test("line insertions and deletions at every boundary match full tokenization", () => {
+  const lines = ["const a = 1;", "const b = 2;", "const c = 3;"];
+  const document = new IncrementalDocument(new Tokenizer(new JavaScript()), lines.join("\n"));
+
+  for (const [start, deleted, inserted] of [
+    [0, 0, ["const first = 0;"]],
+    [lines.length, 0, ["const last = 4;"]],
+    [1, 1, []],
+    [0, 1, ["const replacement = 9;"]],
+  ]) {
+    document.updateLines(start, deleted, inserted);
+    lines.splice(start, deleted, ...inserted);
+    assert.deepEqual(
+      document.getTokens(),
+      new Tokenizer(new JavaScript()).tokenizeWithState(lines.join("\n")).tokens,
+    );
+  }
+});
+
 test("converges after insertion by applying the line delta", () => {
   const document = new IncrementalDocument(
     new Tokenizer(new JavaScript()),
@@ -105,6 +139,67 @@ test("propagating a multiline state to EOF never duplicates existing lines", () 
   assert.deepEqual(document.getLines().map((line) => line.stateAfter.at(-1)), [
     "inMultiLineComment", "inMultiLineComment", "inMultiLineComment", "inMultiLineComment", "inMultiLineComment",
   ]);
+});
+
+test("does not reuse line-index-dependent tokens after a line shift", () => {
+  const { CSV } = require("../dist/cjs/languages/CSV");
+  let document = new IncrementalDocument(new Tokenizer(new CSV()), "a,b\n1,2");
+  document.updateLines(0, 0, ["x,y"]);
+  assert.deepEqual(
+    document.getLines().map((line) => line.tokens.map((token) => token.type)),
+    [
+      ["csv-header", "delimiter", "csv-header"],
+      ["string", "delimiter", "string"],
+      ["number", "delimiter", "number"],
+    ],
+  );
+
+  document = new IncrementalDocument(new Tokenizer(new CSV()), "a,b\n1,2");
+  document.updateLines(0, 1, []);
+  assert.deepEqual(
+    document.getLine(0).tokens.map((token) => token.type),
+    ["csv-header", "delimiter", "csv-header"],
+  );
+});
+
+test("disables suffix convergence for custom index-sensitive contexts", () => {
+  const language = {
+    name: "index-sensitive",
+    extensions: [".index-sensitive"],
+    getStates: () => ({
+      root: [
+        {
+          name: "first-line",
+          pattern: /./g,
+          context: (_line, _position, _tokens, _stateStack, lineIndex) =>
+            lineIndex === 0,
+        },
+        { name: "other-line", pattern: /./g },
+      ],
+    }),
+  };
+  const document = new IncrementalDocument(new Tokenizer(language), "a\na");
+  document.updateLines(0, 0, ["a"]);
+  assert.deepEqual(
+    document.getLines().map((line) => line.tokens[0].type),
+    ["first-line", "other-line", "other-line"],
+  );
+});
+
+test("reports no retokenization for no-op and identical replacement updates", () => {
+  const document = new IncrementalDocument(
+    new Tokenizer(new JavaScript()),
+    "const a = 1;\nconst b = 2;",
+  );
+  assert.equal(document.updateLines(1, 0, []).retokenizedLines, 0);
+  assert.equal(document.updateLines(0, 1, ["const a = 1;"]).retokenizedLines, 0);
+  assert.equal(document.getText(), "const a = 1;\nconst b = 2;");
+});
+
+test("rejects inserted lines that contain newline characters", () => {
+  const document = new IncrementalDocument(new Tokenizer(new JavaScript()), "a");
+  assert.throws(() => document.updateLines(0, 0, ["a\nb"]), /single-line strings/);
+  assert.throws(() => document.updateLines(0, 0, "a"), /array of single-line strings/);
 });
 
 test("large edits preserve structural size and converge quickly", () => {

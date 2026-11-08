@@ -1,6 +1,8 @@
 import { LanguageDefinition } from '../types/language';
 import { JavaScript } from './JavaScript';
 import { TypeScript } from './TypeScript';
+import { JSX } from './JSX';
+import { TSX } from './TSX';
 import { Python } from './Python';
 import { HTML } from './HTML';
 import { CSS } from './CSS';
@@ -13,10 +15,13 @@ import { CPP } from './CPP';
 import { LanguageRegistry } from '../core/LanguageRegistry';
 import { C } from './C';
 import { CSV } from './CSV';
+import { Markdown } from './Markdown';
 
 export const languages: Record<string, LanguageDefinition> = {
   javascript: new JavaScript(),
   typescript: new TypeScript(),
+  jsx: new JSX(),
+  tsx: new TSX(),
   python: new Python(),
   html: new HTML(),
   css: new CSS(),
@@ -28,6 +33,7 @@ export const languages: Record<string, LanguageDefinition> = {
   cpp: new CPP(),
   c: new C(),
   csv: new CSV(),
+  markdown: new Markdown(),
 };
 
 export const defaultRegistry = new LanguageRegistry();

@@ -2,6 +2,8 @@ import { Token, TokenType } from "./token";
 
 export interface TokenizerOptions {
   maxStateDepth?: number;
+  /** Validates the language definition before compiling it. Defaults to true. */
+  validate?: boolean;
 }
 
 export interface CompiledTokenRule {

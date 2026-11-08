@@ -233,7 +233,7 @@ test("clearCache recompiles a mutated language definition", () => {
   assert.equal(tokenizer.tokenize("two").length, 1);
 });
 
-test("a missing popTo target leaves the state stack unchanged", () => {
+test("a missing popTo target is rejected by default", () => {
   const tokenizer = new Tokenizer(
     languageFrom({
       root: [{ name: "open", pattern: /\[/g, push: "inner" }],
@@ -241,8 +241,95 @@ test("a missing popTo target leaves the state stack unchanged", () => {
     }),
   );
 
+  assert.throws(() => tokenizer.tokenizeWithState("[x"), /pops to unknown state/);
+});
+
+test("validation can be disabled for legacy lenient behavior", () => {
+  const tokenizer = new Tokenizer(
+    languageFrom({
+      root: [{ name: "open", pattern: /\[/g, push: "inner" }],
+      inner: [{ name: "invalid", pattern: /x/g, popTo: "missing" }],
+    }),
+    { validate: false },
+  );
+
   const result = tokenizer.tokenizeWithState("[x");
   assert.deepEqual(result.finalStateStack, ["root", "inner"]);
+});
+
+test("rejects malformed language definitions before tokenizing", () => {
+  const cases = [
+    [
+      "missing root",
+      {},
+      /missing required "root" state/,
+    ],
+    [
+      "non-RegExp pattern",
+      { root: [{ name: "word", pattern: "word" }] },
+      /pattern must be a RegExp/,
+    ],
+    [
+      "zero-width rule without reduction",
+      { root: [{ name: "empty", pattern: /^/g }] },
+      /can match an empty string/,
+    ],
+    [
+      "unknown push target",
+      { root: [{ name: "open", pattern: /a/g, push: "missing" }] },
+      /pushes unknown state "missing"/,
+    ],
+    [
+      "unreachable state",
+      { root: [], orphan: [{ name: "word", pattern: /a/g }] },
+      /state "orphan" is unreachable/,
+    ],
+  ];
+  for (const [label, states, expected] of cases) {
+    const tokenizer = new Tokenizer(languageFrom(states));
+    assert.throws(() => tokenizer.tokenize("a"), expected, label);
+  }
+});
+
+test("reports simple nested quantifiers as warnings without blocking", () => {
+  const tokenizer = new Tokenizer(
+    languageFrom({ root: [{ name: "risky", pattern: /(a+)+/g }] }),
+  );
+  const warnings = tokenizer.getValidationWarnings();
+  assert.equal(warnings.length, 1);
+  assert.match(warnings[0], /catastrophic backtracking/);
+});
+
+test("rejects unknown initial lexical states", () => {
+  const tokenizer = new Tokenizer(
+    languageFrom({ root: [{ name: "word", pattern: /a/g }] }),
+  );
+  assert.throws(
+    () => tokenizer.tokenizeLine("a", ["missing"], 0),
+    /unknown state "missing"/,
+  );
+});
+
+test("rejects dynamic pushes to unknown states", () => {
+  const tokenizer = new Tokenizer(
+    languageFrom({
+      root: [{ name: "open", pattern: /a/g, push: () => "missing" }],
+    }),
+  );
+  assert.throws(() => tokenizer.tokenize("a"), /references unknown state "missing"/);
+});
+
+test("public validateLanguageDefinition reports errors and warnings", () => {
+  const { validateLanguageDefinition } = require("../dist/cjs/core/LanguageValidation");
+  const result = validateLanguageDefinition({
+    name: "broken",
+    extensions: [".broken"],
+    getStates: () => ({
+      root: [{ name: "risky", pattern: /(a+)+/g, push: "missing" }],
+    }),
+  });
+  assert.ok(result.errors.some((error) => error.includes("pushes unknown state")));
+  assert.ok(result.warnings.some((warning) => warning.includes("backtracking")));
 });
 
 test("fuzz: random character soup never crashes or produces invalid tokens", () => {

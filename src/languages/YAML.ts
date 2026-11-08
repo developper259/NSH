@@ -12,6 +12,7 @@ export class YAML implements LanguageDefinition {
   name = "yaml";
   extensions = [".yml", ".yaml"];
   aliases = ["yml"];
+  lineIndexSensitive = false;
 
   private yamlKeywords = ["true", "false", "null", "yes", "no", "on", "off"];
 
