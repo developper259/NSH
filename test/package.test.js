@@ -8,12 +8,18 @@ const test = require("node:test");
 const ROOT = path.join(__dirname, "..");
 
 function run(command, args, cwd) {
-  return execFileSync(command, args, {
-    cwd,
-    encoding: "utf8",
-    stdio: ["ignore", "pipe", "pipe"],
-    shell: process.platform === "win32" && command === "npm",
-  });
+  try {
+    return execFileSync(command, args, {
+      cwd,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+      shell: process.platform === "win32" && command === "npm",
+    });
+  } catch (error) {
+    const stderr = typeof error.stderr === "string" ? error.stderr.trim() : "";
+    if (stderr) error.message += `\n${stderr}`;
+    throw error;
+  }
 }
 
 test("npm pack + install in a temp project exposes CJS, ESM, types and themes", { timeout: 120000 }, () => {
@@ -82,10 +88,22 @@ test("GitHub-style install works via the prepare lifecycle", { timeout: 120000 }
       },
     });
     run("git", ["init", "-q"], gitDir);
-    run("git", ["config", "user.email", "nsh-tests@example.invalid"], gitDir);
-    run("git", ["config", "user.name", "NSH tests"], gitDir);
     run("git", ["add", "."], gitDir);
-    run("git", ["commit", "-qm", "package test"], gitDir);
+    run(
+      "git",
+      [
+        "-c",
+        "user.email=nsh-tests@example.invalid",
+        "-c",
+        "user.name=NSH tests",
+        "-c",
+        "commit.gpgsign=false",
+        "commit",
+        "-qm",
+        "package test",
+      ],
+      gitDir,
+    );
 
     const consumer = path.join(tmp, "consumer");
     fs.mkdirSync(consumer, { recursive: true });
