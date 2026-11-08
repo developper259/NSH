@@ -9,7 +9,7 @@ import {
   NUMBER_PATTERNS,
   COMMENT_PATTERNS,
 } from "./shared";
-import { lastSignificantToken } from "./context";
+import { lastSignificantToken, matchingAngleBracket } from "./context";
 
 export class CPP implements LanguageDefinition {
   name = "cpp";
@@ -355,8 +355,6 @@ const rawStringPush: StatePushResolver = (
   return `inRawString:${encodeURIComponent(delimiter)}`;
 };
 
-const GENERIC_LOOKAHEAD = 512;
-const DECLARATION_SCAN_TOKENS = 64;
 const DECLARATION_KEYWORDS = new Set([
   "class",
   "struct",
@@ -390,11 +388,11 @@ function isCppGeneric(
 ): boolean {
   if (line[position] !== "<") return false;
 
-  const snippet = line.slice(
-    position,
-    Math.min(line.length, position + GENERIC_LOOKAHEAD),
+  const end = matchingAngleBracket(tokens, line, position);
+  if (end === undefined) return false;
+  const match = /^<[a-zA-Z0-9_,:\s<>\[\]*&]+>/.exec(
+    line.slice(position, end + 1),
   );
-  const match = /^<[a-zA-Z0-9_,:\s<>\[\]*&]+>/.exec(snippet);
   if (!match) return false;
 
   const content = match[0].slice(1, -1);
@@ -409,11 +407,7 @@ function isCppGeneric(
     return true;
   }
 
-  for (
-    let index = tokens.length - 1, steps = 0;
-    index >= 0 && steps < DECLARATION_SCAN_TOKENS;
-    index -= 1, steps += 1
-  ) {
+  for (let index = tokens.length - 1; index >= 0; index -= 1) {
     const token = tokens[index];
     if (token.value === ";" || token.value === "{" || token.value === "}") {
       break;

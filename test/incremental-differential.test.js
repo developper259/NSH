@@ -17,6 +17,7 @@ const { SQL } = require("../dist/cjs/languages/SQL");
 const { Rust } = require("../dist/cjs/languages/Rust");
 const { Go } = require("../dist/cjs/languages/Go");
 const { SCSS } = require("../dist/cjs/languages/SCSS");
+const { Sass } = require("../dist/cjs/languages/Sass");
 
 const SCENARIOS = [
   {
@@ -247,6 +248,22 @@ const SCENARIOS = [
       "  @include box(20px);",
       "  &:hover { color: $primary; }",
       "}",
+      "// comment",
+      "",
+    ],
+  },
+  {
+    name: "Sass",
+    language: new Sass(),
+    seed: 0x091a2b,
+    snippets: [
+      "$primary: red",
+      "@mixin box($size: 10px)",
+      "  width: $size",
+      ".card",
+      "  @include box(20px);",
+      "  &:hover",
+      "    color: $primary",
       "// comment",
       "",
     ],

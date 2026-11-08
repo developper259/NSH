@@ -144,7 +144,22 @@ test("regex detection keeps statement and expression contexts distinct", () => {
   }
 });
 
-test("caps the state stack at the configured depth", () => {
+test("caps the state stack only when truncation is explicitly requested", () => {
+  const tokenizer = new Tokenizer(
+    languageFrom({
+      root: [{ name: "open", pattern: /a/g, push: "nested" }],
+      nested: [{ name: "open", pattern: /a/g, push: "nested" }],
+    }),
+    { maxStateDepth: 10, onStateDepthExceeded: "truncate" },
+  );
+
+  const result = tokenizer.tokenizeWithState("a".repeat(100));
+  assert.equal(result.tokens.length, 100);
+  assert.ok(result.finalStateStack.length <= 10);
+  assert.equal(tokenizer.getMaxStateDepth(), 10);
+});
+
+test("throws instead of silently truncating an overflowing state stack", () => {
   const tokenizer = new Tokenizer(
     languageFrom({
       root: [{ name: "open", pattern: /a/g, push: "nested" }],
@@ -153,10 +168,25 @@ test("caps the state stack at the configured depth", () => {
     { maxStateDepth: 10 },
   );
 
-  const result = tokenizer.tokenizeWithState("a".repeat(100));
-  assert.equal(result.tokens.length, 100);
-  assert.ok(result.finalStateStack.length <= 10);
-  assert.equal(tokenizer.getMaxStateDepth(), 10);
+  assert.throws(
+    () => tokenizer.tokenizeWithState("a".repeat(11)),
+    /exceeded maxStateDepth/,
+  );
+});
+
+test("throws for an oversized initial state stack by default", () => {
+  const tokenizer = new Tokenizer(
+    languageFrom({
+      root: [{ name: "word", pattern: /a/g }],
+      nested: [],
+    }),
+    { maxStateDepth: 2, validate: false },
+  );
+
+  assert.throws(
+    () => tokenizer.tokenizeLine("a", ["root", "nested", "nested"], 0),
+    /initial lexical state stack exceeds maxStateDepth/,
+  );
 });
 
 test("supports zero-length state reductions without consuming characters", () => {
@@ -291,13 +321,16 @@ test("rejects malformed language definitions before tokenizing", () => {
   }
 });
 
-test("reports simple nested quantifiers as warnings without blocking", () => {
-  const tokenizer = new Tokenizer(
-    languageFrom({ root: [{ name: "risky", pattern: /(a+)+/g }] }),
+test("rejects obviously unsafe nested quantifiers unless validation is disabled", () => {
+  const language = languageFrom({
+    root: [{ name: "risky", pattern: /(a+)+/g }],
+  });
+  assert.throws(
+    () => new Tokenizer(language).tokenize(""),
+    /catastrophic backtracking/,
   );
-  const warnings = tokenizer.getValidationWarnings();
-  assert.equal(warnings.length, 1);
-  assert.match(warnings[0], /catastrophic backtracking/);
+  const tokenizer = new Tokenizer(language, { validate: false });
+  assert.doesNotThrow(() => tokenizer.tokenize(""));
 });
 
 test("rejects unknown initial lexical states", () => {
@@ -329,7 +362,7 @@ test("public validateLanguageDefinition reports errors and warnings", () => {
     }),
   });
   assert.ok(result.errors.some((error) => error.includes("pushes unknown state")));
-  assert.ok(result.warnings.some((warning) => warning.includes("backtracking")));
+  assert.ok(result.errors.some((error) => error.includes("backtracking")));
 });
 
 test("fuzz: random character soup never crashes or produces invalid tokens", () => {

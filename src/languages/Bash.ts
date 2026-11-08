@@ -28,12 +28,16 @@ const BASH_KEYWORDS = [
 
 const BASH_BUILTINS = [
   "alias",
+  "autoload",
   "bg",
   "bind",
+  "bindkey",
   "break",
   "builtin",
   "caller",
   "cd",
+  "chdir",
+  "compctl",
   "command",
   "compgen",
   "complete",
@@ -42,6 +46,7 @@ const BASH_BUILTINS = [
   "dirs",
   "disown",
   "echo",
+  "emulate",
   "enable",
   "eval",
   "exec",
@@ -63,12 +68,14 @@ const BASH_BUILTINS = [
   "popd",
   "printf",
   "pushd",
+  "print",
   "pwd",
   "read",
   "readarray",
   "readonly",
   "return",
   "set",
+  "setopt",
   "shift",
   "shopt",
   "source",
@@ -83,7 +90,17 @@ const BASH_BUILTINS = [
   "umask",
   "unalias",
   "unset",
+  "unsetopt",
   "wait",
+  "whence",
+  "where",
+  "which",
+  "zle",
+  "zmodload",
+  "zparseopts",
+  "zregexparse",
+  "zstat",
+  "zstyle",
 ];
 
 const VARIABLE_PATTERN =
@@ -134,8 +151,29 @@ export class Bash implements LanguageDefinition {
         },
         {
           name: "variable",
+          pattern: /\$\(\((?:[^()]|\([^()]*\))*\)\)/g,
+          className: "nsh-variable",
+        },
+        {
+          name: "variable",
+          pattern: /\$\((?:[^()]|\([^()]*\))*\)/g,
+          className: "nsh-variable",
+        },
+        {
+          name: "variable",
           pattern: VARIABLE_PATTERN,
           className: "nsh-variable",
+        },
+        {
+          name: "string",
+          pattern: /\$'(?:[^'\\]|\\.)*'/g,
+          className: "nsh-string",
+        },
+        {
+          name: "string",
+          pattern: /\$"/g,
+          className: "nsh-string",
+          push: "inDoubleString",
         },
         {
           name: "string",
@@ -162,7 +200,7 @@ export class Bash implements LanguageDefinition {
         {
           name: "operator",
           pattern:
-            /&&|\|\||;;|>>|<<|[|&;<>(){}[\]=!+\-*/%]/g,
+            /\[\[|\]\]|<\(|>\(|&&|\|\||;;|>>|<<|[|&;<>(){}[\]=!+\-*/%]/g,
           className: "nsh-operator",
         },
         createVariableToken(),

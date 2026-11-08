@@ -363,6 +363,7 @@ NSH currently includes the following built-in language definitions:
 | Rust       | `.rs`                                        |
 | Go         | `.go`                                        |
 | SCSS       | `.scss`                                      |
+| Sass       | `.sass`                                      |
 
 > YAML support is currently experimental.
 
@@ -375,10 +376,13 @@ Markdown supports headings, lists, blockquotes, separators, inline markup, links
 images, tables, embedded HTML and fenced code blocks. Fenced code with a recognized
 info string is dispatched to an embedded language definition. Supported fence names
 include `js`, `ts`, `jsx`, `tsx`, `py`, `html`, `css`, `json`, `yaml`, `sh`, `sql`,
-`rust`, `go` and `scss`; aliases such as `javascript`, `python`, `bash` and `rs`
-also work. Unknown info strings fall back to plain code-block highlighting.
+`rust`, `go`, `scss` and `sass`; aliases such as `javascript`, `python`, `bash` and
+`rs` also work. Unknown info strings fall back to plain code-block highlighting.
+Fences may be opened inside blockquotes and list items; blockquote prefixes are
+preserved as tokens while the remaining code is tokenized by the embedded language.
 
-SCSS is supported. The indented Sass syntax (`.sass`) is not.
+SCSS and indented Sass are supported. Sass is highlighted lexically by line and
+indentation; it does not build a structural indentation parser.
 
 ---
 
@@ -539,6 +543,8 @@ throw a `LanguageValidationError` whose message lists the concrete issues:
 - empty-match rules without `pop`, `popTo` or `popPrefix` (these cannot make
   progress);
 - states that are unreachable from `root` when all pushes are static;
+- obviously nested quantifiers such as `(a+)+` that can trigger catastrophic
+  backtracking;
 - unknown initial state names or dynamic push targets at runtime.
 
 An empty-match rule is allowed when it performs a state reduction, which is how
@@ -557,11 +563,13 @@ console.log(result.errors);
 console.log(result.warnings);
 ```
 
-`Tokenizer.getValidationWarnings()` exposes deferred warnings, including a
-conservative nested-quantifier heuristic for patterns such as `(a+)+`. Warnings do
-not reject a definition. JavaScript cannot interrupt a synchronous regular
-expression that is already backtracking, so NSH does not claim a runtime regex
-timeout; keep patterns bounded and prefer lexical states for complex syntax.
+`Tokenizer.getValidationWarnings()` exposes non-blocking warnings. Obvious nested
+quantifiers are rejected as errors before tokenization starts. JavaScript cannot
+interrupt a synchronous regular expression that is already backtracking, so NSH
+does not claim a runtime regex timeout; keep patterns bounded and prefer lexical
+states for complex syntax. A true timeout would require running the tokenizer in an
+asynchronous Worker/Web Worker. `validate: false` bypasses these checks and should
+only be used for audited legacy definitions.
 
 Validation can be disabled for legacy definitions:
 
@@ -608,6 +616,9 @@ By default:
 - line ranges: 5,000 lines per request
 - lexical state depth: 64
 - heartbeat: every 30 seconds
+
+Documents whose lexical state stack would exceed the configured depth are rejected
+with an explicit error instead of being tokenized with a truncated stack.
 
 You can configure and harden it:
 
@@ -846,62 +857,63 @@ Initial tokenization:
 
 | Language   | Lines  | Chars    | Tokens   | Median ms | p95 ms |
 | ---------- | ------ | -------- | -------- | --------- | ------ |
-| JavaScript | 1,000  | 25,749   | 7,250    | 15.72     | 25.35  |
-| JavaScript | 10,000 | 257,499  | 72,500   | 156.76    | 302.48 |
-| JavaScript | 50,000 | 1,287,499| 362,500  | 847.96    | 1,116.89 |
-| JavaScript | 100,000| 2,574,999| 725,000  | 1,982.93  | 2,503.09 |
-| TypeScript | 10,000 | 417,499  | 127,500  | 530.38    | 1,481.48 |
-| TypeScript | 100,000| 4,174,999| 1,275,000| 5,462.29  | 5,817.23 |
-| Python     | 10,000 | 174,999  | 60,000   | 535.83    | 540.94 |
-| HTML       | 10,000 | 279,999  | 75,000   | 144.34    | 147.57 |
-| CSS        | 10,000 | 349,999  | 110,000  | 377.42    | 673.23 |
-| JSON       | 10,000 | 429,999  | 130,000  | 240.16    | 280.44 |
-| Markdown   | 10,000 | 147,499  | 17,500   | 136.19    | 163.43 |
-| Bash       | 10,000 | 165,999  | 48,000   | 109.29    | 128.83 |
-| SQL        | 10,000 | 223,338  | 56,668   | 149.34    | 159.59 |
-| Rust       | 10,000 | 142,499  | 52,500   | 145.20    | 146.78 |
-| Go         | 10,000 | 109,999  | 28,000   | 134.41    | 158.79 |
-| SCSS       | 10,000 | 141,999  | 40,000   | 113.01    | 142.82 |
+| JavaScript | 1,000  | 25,749   | 7,250    | 8.97      | 30.50  |
+| JavaScript | 10,000 | 257,499  | 72,500   | 107.17    | 225.01 |
+| JavaScript | 50,000 | 1,287,499| 362,500  | 418.81    | 487.27 |
+| JavaScript | 100,000| 2,574,999| 725,000  | 818.90    | 1,006.41 |
+| TypeScript | 10,000 | 417,499  | 127,500  | 285.88    | 444.85 |
+| TypeScript | 100,000| 4,174,999| 1,275,000| 2,433.25  | 3,416.28 |
+| Python     | 10,000 | 174,999  | 60,000   | 206.90    | 266.15 |
+| HTML       | 10,000 | 279,999  | 75,000   | 79.45     | 112.34 |
+| CSS        | 10,000 | 349,999  | 110,000  | 167.35    | 176.45 |
+| JSON       | 10,000 | 429,999  | 130,000  | 128.64    | 132.30 |
+| Markdown   | 10,000 | 147,499  | 17,500   | 67.33     | 69.53  |
+| Bash       | 10,000 | 165,999  | 44,000   | 44.72     | 49.84  |
+| SQL        | 10,000 | 223,338  | 56,668   | 88.44     | 90.46  |
+| Rust       | 10,000 | 142,499  | 52,500   | 107.45    | 411.40 |
+| Go         | 10,000 | 109,999  | 28,000   | 42.44     | 49.94  |
+| SCSS       | 10,000 | 141,999  | 38,000   | 69.13     | 71.27  |
+| Sass       | 10,000 | 127,999  | 24,000   | 78.80     | 190.06 |
 
 Incremental updates on 100,000-line documents:
 
 | Language   | Edit          | Retokenized lines | Median ms | p95 ms |
 | ---------- | ------------- | ----------------- | --------- | ------ |
-| JavaScript | middle        | 2                 | 1.21      | 1.61   |
-| JavaScript | insert start  | 2                 | 1.39      | 3.88   |
-| JavaScript | insert end    | 1                 | 1.10      | 1.46   |
-| JavaScript | delete start  | 1                 | 1.44      | 4.74   |
-| JavaScript | multiline     | 50,000            | 110.05    | 261.96 |
-| TypeScript | middle        | 2                 | 1.02      | 3.71   |
-| TypeScript | insert start  | 2                 | 5.17      | 5.77   |
-| TypeScript | insert end    | 1                 | 2.06      | 2.89   |
-| TypeScript | delete start  | 1                 | 1.15      | 1.26   |
-| TypeScript | multiline     | 50,000            | 88.57     | 118.96 |
+| JavaScript | middle        | 2                 | 0.99      | 1.04   |
+| JavaScript | insert start  | 2                 | 0.95      | 0.99   |
+| JavaScript | insert end    | 1                 | 0.98      | 1.87   |
+| JavaScript | delete start  | 1                 | 0.93      | 1.11   |
+| JavaScript | multiline     | 50,000            | 68.19     | 76.08  |
+| TypeScript | middle        | 2                 | 0.99      | 1.13   |
+| TypeScript | insert start  | 2                 | 1.01      | 1.05   |
+| TypeScript | insert end    | 1                 | 1.43      | 1.77   |
+| TypeScript | delete start  | 1                 | 0.92      | 1.20   |
+| TypeScript | multiline     | 50,000            | 75.18     | 76.31  |
 
 Reads, HTML and long lines:
 
 | Metric                    | Size                | Median ms | p95 ms |
 | ------------------------- | ------------------- | --------- | ------ |
-| `getLine`                 | 100,000 lines       | 0.02      | 0.17   |
-| `getLines(100)`           | 100,000 lines       | 0.13      | 0.15   |
-| `getTokensForLines(100)`  | 100,000 lines       | 0.18      | 0.53   |
-| `getTokens()`             | 100,000 lines       | 183.25    | 276.06 |
-| `getHTML()`               | 10,000 lines        | 250.83    | 289.68 |
-| `highlight()`             | 10,000 lines        | 444.52    | 454.71 |
-| `getHTML()`               | 100,000 lines       | 3,271.07  | 3,339.02 |
-| TypeScript colons         | 120,000 characters  | 131.78    | 135.21 |
-| TypeScript generics       | 272,000 characters  | 166.62    | 233.23 |
-| Python annotations        | 96,000 characters   | 140.69    | 162.24 |
-| C++ angle brackets        | 105,000 characters  | 190.47    | 204.79 |
-| JavaScript symbols        | 500,000 characters  | 451.01    | 538.35 |
-| Minified JSON             | 500,000 characters  | 567.95    | 865.00 |
-| HTML text                 | 500,000 characters  | 0.86      | 0.99   |
+| `getLine`                 | 100,000 lines       | 0.02      | 0.02   |
+| `getLines(100)`           | 100,000 lines       | 0.14      | 0.16   |
+| `getTokensForLines(100)`  | 100,000 lines       | 0.11      | 0.18   |
+| `getTokens()`             | 100,000 lines       | 125.46    | 148.36 |
+| `getHTML()`               | 10,000 lines        | 211.01    | 238.97 |
+| `highlight()`             | 10,000 lines        | 177.73    | 178.88 |
+| `getHTML()`               | 100,000 lines       | 2,070.54  | 2,131.56 |
+| TypeScript colons         | 120,000 characters  | 71.81     | 77.56  |
+| TypeScript generics       | 272,000 characters  | 101.92    | 107.38 |
+| Python annotations        | 96,000 characters   | 73.21     | 76.21  |
+| C++ angle brackets        | 105,000 characters  | 250.09    | 309.16 |
+| JavaScript symbols        | 500,000 characters  | 283.83    | 284.39 |
+| Minified JSON             | 500,000 characters  | 387.34    | 401.91 |
+| HTML text                 | 500,000 characters  | 0.46      | 0.53   |
 
 Document construction memory (JavaScript):
 
 | Lines   | Chars     | Tokens  | Heap delta | Bytes/char |
 | ------- | --------- | ------- | ---------- | ---------- |
-| 10,000  | 257,499   | 72,500  | 8.16 MiB   | 33.22      |
+| 10,000  | 257,499   | 72,500  | 8.16 MiB   | 33.21      |
 | 50,000  | 1,287,499 | 362,500 | 31.95 MiB  | 26.02      |
 | 100,000 | 2,574,999 | 725,000 | 39.09 MiB  | 15.92      |
 
@@ -1114,31 +1126,37 @@ Examples include:
 - some deeply nested TypeScript type constructs;
 - JSX/TSX angle-bracket ambiguity between generics, type parameters and tags;
 - Markdown headings, blockquotes and table headers are line-level constructs rather than nested inline parses;
-- Markdown blockquoted or list-indented fences are not opened as fences;
 - JSX closing tags must terminate on the same physical line;
-- Bash/SCSS/SQL/Rust/Go support is lexical and intentionally does not attempt full language validation;
-- Rust block comments are not nested;
+- Bash/SCSS/Sass/SQL/Rust/Go support is lexical and intentionally does not attempt full language validation;
+- Sass indentation is lexically highlighted rather than structurally parsed;
 - SQL dialects and Bash grammar variants are approximated.
 
-Long-line guards are intentionally bounded rather than unlimited:
+Generic detection no longer uses fixed character windows. TypeScript, Java and C++
+locate the matching `>` through a per-line angle-bracket cache, so long generic
+lists are classified without an arbitrary cutoff. Extremely deeply nested
+single-line generics still cost more because their matched span is inspected;
+ordinary long lines remain linear. JSX/TSX component tags now accept type
+arguments such as `<Select<string>>`.
 
-- TypeScript generic lookahead is limited to 256 characters;
-- Java generic matching is limited to 256 characters inside the angle brackets;
-- C++ generic detection is limited to a 512-character window.
+Lexical state depth is bounded by `maxStateDepth` (64 by default). By default, a
+push that would exceed the limit throws a `RangeError` instead of silently losing
+lexical state. For the legacy capped behavior, opt in explicitly:
 
-Content beyond those windows is still tokenized, but it may be emitted as
-operators/identifiers instead of a single generic token. This keeps pathological
-single-line files linear and prevents full-line rescans on every rule check.
+```ts
+new Tokenizer(language, {
+  maxStateDepth: 64,
+  onStateDepthExceeded: "truncate",
+});
+```
 
-Lexical state depth is capped by `maxStateDepth` (64 by default). Additional
-pushes beyond that depth are ignored rather than growing memory without bound.
-This is a documented safety degradation; increase the option if a language
-legitimately needs a deeper stack.
+Increase `maxStateDepth` when a language legitimately needs a deeper stack.
 
 NSH cannot interrupt a synchronous regular expression that has already entered
-catastrophic backtracking. Validation reports obvious nested quantifiers as
-warnings, but authors must keep regexes bounded and prefer lexical states for
-complex syntax. JavaScript provides no portable synchronous regex timeout.
+catastrophic backtracking. This is a JavaScript runtime limitation: there is no
+portable way to abort a blocked native regex call from the same thread. Validation
+rejects structural mistakes and reports obvious nested quantifiers as warnings;
+authors must keep regexes bounded and prefer lexical states for complex syntax.
+An asynchronous Worker/Web Worker tokenizer would be required for a true timeout.
 
 Full-document `getTokens()` and `getHTML()` are O(source + tokens) and allocate
 their outputs. For editor refreshes, use line or range APIs instead.

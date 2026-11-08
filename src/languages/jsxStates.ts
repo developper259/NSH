@@ -5,6 +5,8 @@ import { lastSignificantToken } from "./context";
 const JSX_TAG_STATE = "jsxTag";
 const JSX_CHILDREN_STATE = "jsxChildren";
 const JSX_EXPRESSION_STATE = "jsxExpression";
+const JSX_TYPE_ARGUMENTS_STATE = "jsxTypeArguments";
+const JSX_TYPE_OBJECT_STATE = "jsxTypeObject";
 const JSX_DOUBLE_QUOTE_STATE = "jsxDoubleQuote";
 const JSX_SINGLE_QUOTE_STATE = "jsxSingleQuote";
 
@@ -65,6 +67,12 @@ const tagRules: TokenType[] = [
     pattern: /\{/g,
     className: "nsh-bracket",
     push: JSX_EXPRESSION_STATE,
+  },
+  {
+    name: "type-separator",
+    pattern: /</g,
+    className: "nsh-operator",
+    push: JSX_TYPE_ARGUMENTS_STATE,
   },
   {
     name: "string",
@@ -140,6 +148,69 @@ const childrenRules: TokenType[] = [
   { name: "text", pattern: /[^<{]+/g },
 ];
 
+const typeNameRules: TokenType[] = [
+  {
+    name: "keyword",
+    pattern: /\b(?:as|extends|import|infer|keyof|readonly|satisfies|typeof)\b/g,
+    className: "nsh-keyword",
+  },
+  {
+    name: "type",
+    pattern: /[A-Za-z_$][A-Za-z0-9_$.]*/g,
+    className: "nsh-type",
+  },
+  { name: "number", pattern: /\b\d+\b/g, className: "nsh-number" },
+  {
+    name: "string",
+    pattern: /'(?:[^'\\\n]|\\.)*'|"(?:[^"\\\n]|\\.)*"/g,
+    className: "nsh-string",
+  },
+  { name: "operator", pattern: /=>/g, className: "nsh-operator" },
+  {
+    name: "type-separator",
+    pattern: /[,\[\]|&.?=:();]/g,
+    className: "nsh-operator",
+  },
+];
+
+const typeArgumentRules: TokenType[] = [
+  ...typeNameRules,
+  {
+    name: "bracket",
+    pattern: /\{/g,
+    className: "nsh-bracket",
+    push: JSX_TYPE_OBJECT_STATE,
+  },
+  {
+    name: "type-separator",
+    pattern: />/g,
+    className: "nsh-operator",
+    pop: true,
+  },
+  {
+    name: "type-separator",
+    pattern: /</g,
+    className: "nsh-operator",
+    push: JSX_TYPE_ARGUMENTS_STATE,
+  },
+];
+
+const typeObjectRules: TokenType[] = [
+  ...typeNameRules,
+  {
+    name: "bracket",
+    pattern: /\{/g,
+    className: "nsh-bracket",
+    push: JSX_TYPE_OBJECT_STATE,
+  },
+  {
+    name: "bracket",
+    pattern: /\}/g,
+    className: "nsh-bracket",
+    pop: true,
+  },
+];
+
 const doubleQuoteRules: TokenType[] = [
   { name: "string", pattern: /"/g, className: "nsh-string", pop: true },
   { name: "string", pattern: /[^"]+/g, className: "nsh-string" },
@@ -182,6 +253,8 @@ export function createJsxStates(
     [JSX_TAG_STATE]: tagRules,
     [JSX_CHILDREN_STATE]: childrenRules,
     [JSX_EXPRESSION_STATE]: expressionRules,
+    [JSX_TYPE_ARGUMENTS_STATE]: typeArgumentRules,
+    [JSX_TYPE_OBJECT_STATE]: typeObjectRules,
     [JSX_DOUBLE_QUOTE_STATE]: doubleQuoteRules,
     [JSX_SINGLE_QUOTE_STATE]: singleQuoteRules,
   };

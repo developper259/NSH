@@ -50,6 +50,8 @@ const CLASS_MAP: Readonly<Record<string, string>> = {
   lifetime: "nsh-type", macro: "nsh-function", parameter: "nsh-variable",
   "scss-variable": "nsh-variable", "scss-at-rule": "nsh-keyword",
   "scss-interpolation": "nsh-variable", "scss-parent": "nsh-operator",
+  interpolation: "nsh-variable", "selector-placeholder": "nsh-function",
+  parent: "nsh-operator",
 };
 
 const HTML_ESCAPES: Readonly<Record<string, string>> = {

@@ -16,6 +16,7 @@ const { SQL } = require("../dist/cjs/languages/SQL");
 const { Rust } = require("../dist/cjs/languages/Rust");
 const { Go } = require("../dist/cjs/languages/Go");
 const { SCSS } = require("../dist/cjs/languages/SCSS");
+const { Sass } = require("../dist/cjs/languages/Sass");
 const packageJson = require("../package.json");
 
 const SAMPLES = readInteger("NSH_BENCH_SAMPLES", 3, 1);
@@ -122,6 +123,17 @@ const LANGUAGES = [
       "  color: $primary;",
       "  &:hover { color: red; }",
       "}",
+    ],
+  },
+  {
+    name: "sass",
+    language: new Sass(),
+    lines: [
+      "$primary: #333",
+      ".card",
+      "  color: $primary",
+      "  &:hover",
+      "    color: red",
     ],
   },
 ];

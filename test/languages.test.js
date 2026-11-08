@@ -14,6 +14,7 @@ const { SQL } = require("../dist/cjs/languages/SQL");
 const { Rust } = require("../dist/cjs/languages/Rust");
 const { Go } = require("../dist/cjs/languages/Go");
 const { SCSS } = require("../dist/cjs/languages/SCSS");
+const { Sass } = require("../dist/cjs/languages/Sass");
 const { Python } = require("../dist/cjs/languages/Python");
 const { HTML } = require("../dist/cjs/languages/HTML");
 const { CSS } = require("../dist/cjs/languages/CSS");
@@ -51,6 +52,7 @@ test("smoke: every registered language produces tokens on a simple example", () 
     ["Rust", Rust, "fn main() { println!(\"hi\"); }"],
     ["Go", Go, "package main\nfunc main() {}"],
     ["SCSS", SCSS, "$color: red;\n.a { color: $color; }"],
+    ["Sass", Sass, "$color: red\n.a\n  color: $color"],
     ["Python", Python, "def f():\n    return 1"],
     ["HTML", HTML, '<div class="a">hi</div>'],
     ["CSS", CSS, "body { color: red; }"],

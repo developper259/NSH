@@ -37,6 +37,7 @@ export class Tokenizer {
   private lineIndexSensitive = false;
   private validationWarnings: string[] = [];
   private readonly maxStateDepth: number;
+  private readonly onStateDepthExceeded: "throw" | "truncate";
   private readonly validationEnabled: boolean;
   private readonly firstCharacterFilter: boolean;
 
@@ -47,6 +48,13 @@ export class Tokenizer {
     }
     this.language = language;
     this.maxStateDepth = maxStateDepth;
+    const onStateDepthExceeded = options.onStateDepthExceeded ?? "throw";
+    if (onStateDepthExceeded !== "throw" && onStateDepthExceeded !== "truncate") {
+      throw new RangeError(
+        'onStateDepthExceeded must be "throw" or "truncate"',
+      );
+    }
+    this.onStateDepthExceeded = onStateDepthExceeded;
     this.validationEnabled = options.validate ?? true;
     this.firstCharacterFilter = options.firstCharacterFilter ?? true;
   }
@@ -252,6 +260,10 @@ export class Tokenizer {
         this.assertKnownState(pushed, rule.name);
         if (stateStack.length < this.maxStateDepth) {
           stateStack.push(pushed);
+        } else if (this.onStateDepthExceeded === "throw") {
+          throw new RangeError(
+            `lexical state stack exceeded maxStateDepth (${this.maxStateDepth})`,
+          );
         }
       }
     }
@@ -262,6 +274,14 @@ export class Tokenizer {
   private sanitizeStateStack(initialStateStack: string[]): string[] {
     if (!initialStateStack || initialStateStack.length === 0) {
       return [...DEFAULT_STATE];
+    }
+    if (
+      initialStateStack.length > this.maxStateDepth &&
+      this.onStateDepthExceeded === "throw"
+    ) {
+      throw new RangeError(
+        `initial lexical state stack exceeds maxStateDepth (${this.maxStateDepth})`,
+      );
     }
     const stateStack =
       initialStateStack.length <= this.maxStateDepth

@@ -48,6 +48,28 @@ test("long C++ comparison lines stay linear and valid", () => {
   assert.equal(tokens.some((token) => token.type === "generic"), false);
 });
 
+test("generic arguments are not limited by fixed lookahead windows", () => {
+  const typeArguments = Array.from({ length: 120 }, (_, index) => `T${index}`).join(", ");
+  const typescriptLine = `const result = foo<${typeArguments}>(value);`;
+  const typescriptTokens = new Tokenizer(new TypeScript()).tokenize(typescriptLine);
+  assert.ok(
+    typescriptTokens.some(
+      (token) => token.type === "type-separator" && token.value === "<",
+    ),
+  );
+  assert.ok(typescriptTokens.some((token) => token.type === "type" && token.value === "T0"));
+
+  const javaLine = `Map<${typeArguments}> value;`;
+  const javaTokens = new Tokenizer(
+    new (require("../dist/cjs/languages/Java").Java)(),
+  ).tokenize(javaLine);
+  assert.ok(javaTokens.some((token) => token.type === "generic"));
+
+  const cppLine = `template <${typeArguments}> void f();`;
+  const cppTokens = new Tokenizer(new CPP()).tokenize(cppLine);
+  assert.ok(cppTokens.some((token) => token.type === "generic"));
+});
+
 test("very long single tokens and text runs remain valid", () => {
   const cases = [
     [new JavaScript(), "a".repeat(200000)],

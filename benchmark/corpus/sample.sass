@@ -1,0 +1,14 @@
+$primary: #333
+
+@mixin box($size: 10px)
+  width: $size
+  .child
+    color: lighten($primary, 10%)
+
+.card
+  @include box(20px)
+
+  &:hover
+    color: $primary
+
+  content: #{$primary}

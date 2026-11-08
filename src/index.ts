@@ -18,6 +18,7 @@ export { SQL } from './languages/SQL';
 export { Rust } from './languages/Rust';
 export { Go } from './languages/Go';
 export { SCSS } from './languages/SCSS';
+export { Sass } from './languages/Sass';
 export { Python } from './languages/Python';
 export { HTML } from './languages/HTML';
 export { CSS } from './languages/CSS';

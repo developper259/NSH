@@ -22,6 +22,7 @@ const EXTENSIONS = new Set([
   ".sql",
   ".sh",
   ".scss",
+  ".sass",
   ".html",
   ".json",
 ]);

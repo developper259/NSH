@@ -579,28 +579,37 @@ test("document budgets and truncated update responses are enforced", async () =>
   }
 });
 
-test("server tokenizers honor the configured state depth", async () => {
+test("server reports state-depth overflow instead of truncating silently", async () => {
   const server = new NSHServer({ maxStateDepth: 8 });
   try {
     await server.start();
     const client = await connect(server);
-    const code = Array.from({ length: 200 }, () => "{").join("\n");
-    assert.equal(
-      (await request(client, {
-        id: "open",
-        requestType: "openDocument",
-        documentId: "deep",
-        language: "css",
-        code,
-      })).success,
-      true,
-    );
+
+    const shallow = await request(client, {
+      id: "shallow",
+      requestType: "openDocument",
+      documentId: "shallow",
+      language: "css",
+      code: "a { b { c { color: red; } } }",
+    });
+    assert.equal(shallow.success, true);
+
+    const deep = await request(client, {
+      id: "deep",
+      requestType: "openDocument",
+      documentId: "deep",
+      language: "css",
+      code: Array.from({ length: 200 }, () => "{").join("\n"),
+    });
+    assert.equal(deep.success, false);
+    assert.match(deep.error, /state depth/i);
+
     const lines = await request(client, {
       id: "read",
       requestType: "getDocumentLines",
-      documentId: "deep",
-      startLine: 199,
-      endLine: 200,
+      documentId: "shallow",
+      startLine: 0,
+      endLine: 1,
     });
     assert.equal(lines.success, true);
     assert.ok(lines.lines[0].stateAfter.length <= 8);

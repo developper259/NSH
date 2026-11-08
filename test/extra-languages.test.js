@@ -6,6 +6,7 @@ const { SQL } = require("../dist/cjs/languages/SQL");
 const { Rust } = require("../dist/cjs/languages/Rust");
 const { Go } = require("../dist/cjs/languages/Go");
 const { SCSS } = require("../dist/cjs/languages/SCSS");
+const { Sass } = require("../dist/cjs/languages/Sass");
 
 function tokenize(language, code) {
   const tokenizer = new Tokenizer(language);
@@ -20,6 +21,22 @@ function find(tokens, value, type) {
   if (type) assert.equal(token.type, type);
   return token;
 }
+
+test("Bash handles arithmetic, parameter defaults and process substitution", () => {
+  const code = [
+    "value=$((1 + 2))",
+    "path=${HOME:-/tmp}",
+    "diff <(sort a) <(sort b)",
+    "setopt extended_glob",
+    "echo $value",
+  ].join("\n");
+  const tokens = tokenize(new Bash(), code);
+
+  find(tokens, "$((1 + 2))", "variable");
+  find(tokens, "${HOME:-/tmp}", "variable");
+  find(tokens, "<(", "operator");
+  find(tokens, "setopt", "builtin");
+});
 
 test("Bash handles variables, interpolation, comments and heredocs", () => {
   const code = [
@@ -40,6 +57,24 @@ test("Bash handles variables, interpolation, comments and heredocs", () => {
   find(tokens, "$name", "variable");
   find(tokens, "# greeting", "comment");
   find(tokens, "EOF", "string");
+});
+
+test("SQL supports dollar strings, dialect keywords and hash comments", () => {
+  const code = [
+    "# dialect note",
+    "SELECT $tag$line",
+    "still$tag$::text, name ILIKE 'a%'",
+    "FROM users",
+    "ON CONFLICT DO NOTHING",
+    "RETURNING id;",
+  ].join("\n");
+  const result = new Tokenizer(new SQL()).tokenizeWithState(code);
+  assert.deepEqual(result.finalStateStack, ["root"]);
+  assert.ok(result.tokens.some((token) => token.type === "string" && token.value === "$tag$"));
+  assert.ok(result.tokens.some((token) => token.value === "ILIKE" && token.type === "keyword"));
+  assert.ok(result.tokens.some((token) => token.value === "CONFLICT" && token.type === "keyword"));
+  assert.ok(result.tokens.some((token) => token.value === "NOTHING" && token.type === "keyword"));
+  assert.ok(result.tokens.some((token) => token.value === "# dialect note" && token.type === "comment"));
 });
 
 test("SQL is case-insensitive and keeps strings/comments/parameters coherent", () => {
@@ -87,6 +122,20 @@ test("Rust handles attributes, lifetimes, chars and raw strings", () => {
   find(tokens, "println", "builtin");
 });
 
+test("Rust block comments nest", () => {
+  const code = [
+    "/* outer",
+    "   /* inner */",
+    "   still outer",
+    "*/",
+    "fn main() {}",
+  ].join("\n");
+  const result = new Tokenizer(new Rust()).tokenizeWithState(code);
+  assert.deepEqual(result.finalStateStack, ["root"]);
+  assert.ok(result.tokens.filter((token) => token.type === "comment").length >= 4);
+  assert.ok(result.tokens.some((token) => token.line === 5 && token.value === "fn"));
+});
+
 test("Rust raw strings stay inside their delimiter across lines", () => {
   const code = ['let value = r##"line', '"# still content', 'end"##;', "let done = 1;"].join("\n");
   const result = new Tokenizer(new Rust()).tokenizeWithState(code);
@@ -119,6 +168,29 @@ test("Go handles raw strings, runes, comments and types", () => {
   assert.ok(tokens.filter((token) => token.type === "string").length >= 4);
 });
 
+test("SCSS handles placeholders, maps, flags and advanced directives", () => {
+  const code = [
+    '%button { color: red; }',
+    '@use "theme" with ($primary: #333);',
+    '$map: (key: value, other: 2);',
+    ".card {",
+    "  @extend %button;",
+    "  @if $condition { margin: 0 !default; }",
+    "  args: $values...;",
+    "  &:focus-visible { color: $primary; }",
+    "}",
+  ].join("\n");
+  const tokens = tokenize(new SCSS(), code);
+
+  find(tokens, "%button", "selector-placeholder");
+  find(tokens, "@use", "scss-at-rule");
+  find(tokens, "$map", "scss-variable");
+  find(tokens, "@extend", "scss-at-rule");
+  find(tokens, "!default", "important");
+  find(tokens, "...", "spread");
+  find(tokens, ":focus-visible", "pseudo-class");
+});
+
 test("SCSS handles variables, at-rules, interpolation and nested selectors", () => {
   const code = [
     "// variables",
@@ -145,6 +217,34 @@ test("SCSS handles variables, at-rules, interpolation and nested selectors", () 
   assert.ok(tokens.some((token) => token.type === "scss-interpolation"));
 });
 
+test("indented Sass handles variables, directives, properties and selectors", () => {
+  const code = [
+    "$primary: #333",
+    "@mixin box($size: 10px)",
+    "  width: $size",
+    "  .child",
+    "    color: lighten($primary, 10%)",
+    "",
+    ".card",
+    "  @include box(20px)",
+    "  &:hover",
+    "    color: $primary",
+    "  content: #{$primary}",
+  ].join("\n");
+  const tokens = tokenize(new Sass(), code);
+
+  find(tokens, "$primary", "variable");
+  find(tokens, "@mixin", "at-rule");
+  find(tokens, "@include", "at-rule");
+  find(tokens, "width", "property");
+  find(tokens, "color", "property");
+  find(tokens, ".child", "selector-class");
+  find(tokens, "&", "parent");
+  find(tokens, ":hover", "pseudo-class");
+  assert.ok(tokens.some((token) => token.type === "interpolation"));
+  assert.ok(tokens.some((token) => token.type === "number" && token.value === "20px"));
+});
+
 test("new language extensions are detected", () => {
   const { Highlighter } = require("../dist/cjs/core/Highlighter");
   const cases = [
@@ -154,6 +254,7 @@ test("new language extensions are detected", () => {
     [".rs", "rust"],
     [".go", "go"],
     [".scss", "scss"],
+    [".sass", "sass"],
   ];
   for (const [extension, language] of cases) {
     assert.equal(Highlighter.detectLanguage(extension), language);

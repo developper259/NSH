@@ -159,8 +159,8 @@ export function validateStates(states: unknown): LanguageValidationResult {
       }
 
       if (rule.pattern instanceof RegExp && findNestedQuantifier(rule.pattern.source)) {
-        warnings.push(
-          `${where} contains a simple nested quantifier that may cause catastrophic backtracking`,
+        errors.push(
+          `${where} contains a nested quantifier that can cause catastrophic backtracking`,
         );
       }
     }

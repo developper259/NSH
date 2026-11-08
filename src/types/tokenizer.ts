@@ -2,6 +2,12 @@ import { Token, TokenType } from "./token";
 
 export interface TokenizerOptions {
   maxStateDepth?: number;
+  /**
+   * Behavior when a push would exceed `maxStateDepth`.
+   * Defaults to `"throw"` so deeply nested input never silently loses state.
+   * Use `"truncate"` for the legacy capped behavior.
+   */
+  onStateDepthExceeded?: "throw" | "truncate";
   /** Validates the language definition before compiling it. Defaults to true. */
   validate?: boolean;
   /**

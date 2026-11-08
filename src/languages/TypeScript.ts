@@ -15,10 +15,10 @@ import {
 import {
   enclosingBracket,
   lastSignificantToken,
+  matchingAngleBracket,
   previousSignificantIndex,
 } from "./context";
 
-const GENERIC_LOOKAHEAD = 256;
 const MAX_GENERIC_TOKENS = 128;
 const ROOT_TYPE_PREFIXES = new Set([
   "interface",
@@ -783,21 +783,41 @@ function isGenericStart(
 ): boolean {
   if (line[position] !== "<" || !isRootLikeState(stateStack)) return false;
 
-  const snippet = line.slice(
-    position,
-    Math.min(line.length, position + GENERIC_LOOKAHEAD),
-  );
-  if (/^<\s*[A-Za-z_$][A-Za-z0-9_$]*(?:\s*,[^>]*)?\s*>\s*\(/.test(snippet)) {
-    return true;
-  }
-
   const previous = tokens[tokens.length - 1];
   if (previous?.type === "type") return true;
+
   const beforePrevious = tokens[tokens.length - 2];
-  return (
+  if (
     previous?.type === "variable" &&
     beforePrevious?.type === "keyword" &&
     DECLARATION_KEYWORDS.has(beforePrevious.value)
+  ) {
+    return true;
+  }
+
+  const match = matchingAngleBracket(tokens, line, position);
+  if (match === undefined) return false;
+  let after = match + 1;
+  while (line[after] === " " || line[after] === "\t") after += 1;
+  if (line[after] !== "(") return false;
+
+  if (
+    previous &&
+    (previous.type === "operator" ||
+      previous.type === "arrow-function" ||
+      previous.type === "bracket" ||
+      (previous.type === "keyword" && previous.value === "return"))
+  ) {
+    return true;
+  }
+
+  return (
+    previous !== undefined &&
+    (previous.type === "variable" ||
+      previous.type === "function" ||
+      previous.type === "property") &&
+    position > 0 &&
+    !/\s/.test(line[position - 1])
   );
 }
 

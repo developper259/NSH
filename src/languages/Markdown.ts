@@ -15,11 +15,21 @@ import { SQL } from "./SQL";
 import { Rust } from "./Rust";
 import { Go } from "./Go";
 import { SCSS } from "./SCSS";
+import { Sass } from "./Sass";
 
 const CODE_FENCE_STATE = "inCodeFence";
-const FENCE_PATTERN = /^\s*(`{3,}|~{3,})(.*)$/g;
-const FENCE_MARKER = /^\s*(`{3,}|~{3,})/;
-const FENCE_CLOSE_LINE = /^\s*(`{3,}|~{3,})\s*$/;
+const FENCE_PATTERN = /(`{3,}|~{3,})(.*)$/g;
+const FENCE_MARKER = /^(`{3,}|~{3,})/;
+const FENCE_PREFIX =
+  /^(?:(?: {0,3}>[ \t]?)|(?: {0,3}(?:[-*+]|\d{1,9}[.)])[ \t]+)|\s)*$/;
+const BLOCKQUOTE_PREFIX = /^(?: {0,3}>[ \t]?)+/g;
+
+const QUOTED_BLOCKQUOTE_PREFIX: TokenType = {
+  name: "blockquote",
+  pattern: BLOCKQUOTE_PREFIX,
+  className: "nsh-comment",
+  context: isQuotedFencePrefix,
+};
 
 interface EmbeddedLanguage {
   language: LanguageDefinition;
@@ -42,6 +52,7 @@ const EMBEDDED_LANGUAGES: EmbeddedLanguage[] = [
   { language: new Rust(), prefix: "md_rs_", aliases: ["rust", "rs"] },
   { language: new Go(), prefix: "md_go_", aliases: ["go", "golang"] },
   { language: new SCSS(), prefix: "md_scss_", aliases: ["scss"] },
+  { language: new Sass(), prefix: "md_sass_", aliases: ["sass"] },
 ];
 
 const EMBEDDED_PREFIX_BY_NAME = new Map<string, string>();
@@ -52,8 +63,8 @@ for (const entry of EMBEDDED_LANGUAGES) {
 }
 
 const fencePush: StatePushResolver = (
-  _line,
-  _position,
+  line,
+  position,
   _tokens,
   _stateStack,
   matched,
@@ -65,10 +76,9 @@ const fencePush: StatePushResolver = (
     : "";
   const languageName = info.split(/\s+/)[0];
   const prefix = EMBEDDED_PREFIX_BY_NAME.get(languageName);
-  if (!prefix) {
-    return `${CODE_FENCE_STATE}:${encodeURIComponent(marker)}`;
-  }
-  return `${prefix}root:${encodeURIComponent(marker)}`;
+  const quoted = line.slice(0, position).includes(">") ? "|q" : "";
+  const state = prefix ? `${prefix}root` : CODE_FENCE_STATE;
+  return `${state}:${encodeURIComponent(marker)}${quoted}`;
 };
 
 let markdownStates: Record<string, TokenType[]> | null = null;
@@ -84,20 +94,21 @@ export class Markdown implements LanguageDefinition {
 
     const embeddedStates: Record<string, TokenType[]> = {};
     for (const entry of EMBEDDED_LANGUAGES) {
-      Object.assign(
-        embeddedStates,
-        createEmbeddedStates({
-          language: entry.language,
-          exitRule: {
-            name: "code-fence-end",
-            pattern: createFenceClosePattern(),
-            className: "nsh-string",
-            context: makeFenceEndContext(entry.prefix),
-          },
-          prefix: entry.prefix,
-          exitMode: "parent",
-        }),
-      );
+      const states = createEmbeddedStates({
+        language: entry.language,
+        exitRule: {
+          name: "code-fence-end",
+          pattern: createFenceClosePattern(),
+          className: "nsh-string",
+          context: makeFenceEndContext(entry.prefix),
+        },
+        prefix: entry.prefix,
+        exitMode: "parent",
+      });
+      for (const rules of Object.values(states)) {
+        rules.splice(1, 0, QUOTED_BLOCKQUOTE_PREFIX);
+      }
+      Object.assign(embeddedStates, states);
     }
 
     markdownStates = {
@@ -106,6 +117,7 @@ export class Markdown implements LanguageDefinition {
           name: "code-fence",
           pattern: FENCE_PATTERN,
           className: "nsh-string",
+          context: isFenceStart,
           push: fencePush,
         },
         {
@@ -125,7 +137,7 @@ export class Markdown implements LanguageDefinition {
         },
         {
           name: "blockquote",
-          pattern: /^\s{0,3}>\s?/g,
+          pattern: /^\s{0,3}(?:>\s?)+/g,
           className: "nsh-comment",
         },
         {
@@ -192,6 +204,7 @@ export class Markdown implements LanguageDefinition {
           pop: true,
           context: isFenceEnd,
         },
+        QUOTED_BLOCKQUOTE_PREFIX,
         {
           name: "code-block",
           pattern: /.+/g,
@@ -205,7 +218,7 @@ export class Markdown implements LanguageDefinition {
 }
 
 function createFenceClosePattern(): RegExp {
-  return /^\s*(`{3,}|~{3,})\s*$/g;
+  return /^(?: {0,3}>[ \t]?)*\s*(`{3,}|~{3,})\s*$/g;
 }
 
 function makeFenceEndContext(prefix: string) {
@@ -218,8 +231,8 @@ function makeFenceEndContext(prefix: string) {
     if (position !== 0) return false;
     const markerState = findEmbeddedRootState(stateStack, prefix);
     if (!markerState) return false;
-    const encodedMarker = markerState.slice(`${prefix}root:`.length);
-    return isClosingFence(line, decodeURIComponent(encodedMarker));
+    const opening = parseFenceState(markerState);
+    return isClosingFence(line, opening.marker, opening.quoted);
   };
 }
 
@@ -236,6 +249,24 @@ function findEmbeddedRootState(
   return undefined;
 }
 
+function isFenceStart(
+  line: string,
+  position: number,
+): boolean {
+  if (line[position] !== "`" && line[position] !== "~") return false;
+  return FENCE_PREFIX.test(line.slice(0, position));
+}
+
+function isQuotedFencePrefix(
+  line: string,
+  position: number,
+  _tokens: Token[],
+  stateStack: string[],
+): boolean {
+  if (position !== 0 || line[position] !== ">") return false;
+  return stateStack.some((state) => state.includes("|q"));
+}
+
 function isFenceEnd(
   line: string,
   position: number,
@@ -245,12 +276,30 @@ function isFenceEnd(
   if (position !== 0) return false;
 
   const state = stateStack[stateStack.length - 1];
-  const encodedMarker = state.slice(state.lastIndexOf(":") + 1);
-  return isClosingFence(line, decodeURIComponent(encodedMarker));
+  const opening = parseFenceState(state);
+  return isClosingFence(line, opening.marker, opening.quoted);
 }
 
-function isClosingFence(line: string, opening: string): boolean {
-  const match = FENCE_CLOSE_LINE.exec(line);
+function parseFenceState(state: string): { marker: string; quoted: boolean } {
+  const raw = state.slice(state.lastIndexOf(":") + 1);
+  const [encodedMarker, flag] = raw.split("|");
+  return {
+    marker: decodeURIComponent(encodedMarker ?? ""),
+    quoted: flag === "q",
+  };
+}
+
+function isClosingFence(
+  line: string,
+  opening: string,
+  quoted: boolean,
+): boolean {
+  const prefix = quoted ? /^(?: {0,3}>[ \t]?)*\s*/ : /^\s*/;
+  const prefixMatch = prefix.exec(line);
+  if (!prefixMatch) return false;
+  const match = /^(`{3,}|~{3,})\s*$/.exec(
+    line.slice(prefixMatch[0].length),
+  );
   if (!match) return false;
   return match[1][0] === opening[0] && match[1].length >= opening.length;
 }

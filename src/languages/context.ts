@@ -17,6 +17,44 @@ interface BracketAnalysis {
 // instead of rescanning the whole line for every rule.
 const analyses = new WeakMap<Token[], BracketAnalysis>();
 
+interface AngleAnalysis {
+  line: string;
+  matches: Map<number, number>;
+}
+
+const angleAnalyses = new WeakMap<Token[], AngleAnalysis>();
+
+/**
+ * Returns the position of the `>` matching the `<` at `position`, using a
+ * per-line cache. Contexts use this instead of fixed lookahead windows.
+ */
+export function matchingAngleBracket(
+  tokens: Token[],
+  line: string,
+  position: number,
+): number | undefined {
+  let analysis = angleAnalyses.get(tokens);
+  if (!analysis || analysis.line !== line) {
+    analysis = { line, matches: buildAngleMatches(line) };
+    angleAnalyses.set(tokens, analysis);
+  }
+  return analysis.matches.get(position);
+}
+
+function buildAngleMatches(line: string): Map<number, number> {
+  const stack: number[] = [];
+  const matches = new Map<number, number>();
+  for (let index = 0; index < line.length; index += 1) {
+    const character = line[index];
+    if (character === "<") {
+      stack.push(index);
+    } else if (character === ">" && stack.length > 0) {
+      matches.set(stack.pop() as number, index);
+    }
+  }
+  return matches;
+}
+
 export function enclosingBracket(tokens: Token[]): BracketFrameInfo | undefined {
   let analysis = analyses.get(tokens);
   if (!analysis) {

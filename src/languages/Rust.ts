@@ -213,7 +213,13 @@ export class Rust implements LanguageDefinition {
         },
         {
           name: "comment",
-          pattern: /(?:(?!\*\/).)+/g,
+          pattern: /\/\*/g,
+          className: "nsh-comment",
+          push: "inMultiLineComment",
+        },
+        {
+          name: "comment",
+          pattern: /(?:(?!\/\*|\*\/).)+/g,
           className: "nsh-comment",
         },
       ],

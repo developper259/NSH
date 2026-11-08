@@ -1,5 +1,6 @@
 import { LanguageDefinition } from "../types/language";
-import { TokenType } from "../types/token";
+import { Token, TokenType } from "../types/token";
+import { matchingAngleBracket } from "./context";
 import {
   createKeywordToken,
   createFunctionToken,
@@ -236,9 +237,9 @@ export class Java implements LanguageDefinition {
         createCommentToken(COMMENT_PATTERNS.singleLine.doubleSlash),
         {
           name: "generic",
-          pattern:
-            /(?<=[a-zA-Z_$])<[a-zA-Z][a-zA-Z0-9_,\s<>\[\]?]{0,256}>/g,
+          pattern: /(?<=[a-zA-Z_$])<[a-zA-Z][a-zA-Z0-9_,\s<>\[\]?]*>/g,
           className: "nsh-keyword",
+          context: isJavaGeneric,
         },
         createFunctionToken(),
         { name: "arrow-function", pattern: /->/g, className: "nsh-operator" },
@@ -298,4 +299,14 @@ export class Java implements LanguageDefinition {
     };
   }
 
+}
+
+function isJavaGeneric(
+  line: string,
+  position: number,
+  tokens: Token[],
+): boolean {
+  if (line[position] !== "<") return false;
+  if (position === 0 || !/[a-zA-Z_$]/.test(line[position - 1])) return false;
+  return matchingAngleBracket(tokens, line, position) !== undefined;
 }

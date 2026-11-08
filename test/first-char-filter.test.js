@@ -26,6 +26,7 @@ const SAMPLES = {
   rust: 'fn main() { let v = r#"raw"#; println!("{}", v); }',
   go: "package main\nfunc main() { value := `raw`; _ = value }",
   scss: "$c: #333;\n.a { color: $c; &:hover { color: red; } }",
+  sass: "$c: #333\n.a\n  color: $c\n  &:hover\n    color: red",
 };
 
 test("first-character filter produces the same tokens as the full scan", () => {

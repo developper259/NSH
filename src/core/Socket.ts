@@ -567,11 +567,25 @@ export class NSHServer {
       return;
     }
 
-    state.documents.set(request.documentId, {
-      document: new IncrementalDocument(
+    let document: IncrementalDocument;
+    try {
+      document = new IncrementalDocument(
         this.getOrCreateTokenizer(request.language as string, language),
         request.code,
-      ),
+      );
+    } catch (error) {
+      this.sendError(
+        ws,
+        request.id,
+        isStateDepthError(error)
+          ? "Document exceeds the configured lexical state depth"
+          : "Document could not be tokenized",
+      );
+      return;
+    }
+
+    state.documents.set(request.documentId, {
+      document,
       characters: request.code.length,
     });
     state.documentCharacters = nextCharacters;
@@ -655,8 +669,14 @@ export class NSHServer {
         response.linesTruncated = true;
       }
       this.send(ws, response);
-    } catch {
-      this.sendError(ws, request.id, "Invalid document update");
+    } catch (error) {
+      this.sendError(
+        ws,
+        request.id,
+        isStateDepthError(error)
+          ? "Document exceeds the configured lexical state depth"
+          : "Invalid document update",
+      );
     }
   }
 
@@ -981,6 +1001,13 @@ function isDocumentUpdate(
     request.deletedLines >= 0 &&
     Array.isArray(request.insertedLines) &&
     request.insertedLines.every((line) => typeof line === "string")
+  );
+}
+
+function isStateDepthError(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    /state stack|maxStateDepth|state depth/i.test(error.message)
   );
 }
 

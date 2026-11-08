@@ -88,6 +88,27 @@ test("JSX does not treat comparisons or TSX generic arrows as tags", () => {
   assert.equal(constParameter.some((token) => token.type === "jsx-tag"), false);
 });
 
+test("TSX supports generic arguments on component tags", () => {
+  const code = [
+    "const view = (value: string) => (",
+    "  <Select<string>",
+    "    value={value}",
+    "    render={(item) => <Item<{ id: number }> value={item} />}",
+    "  />",
+    ");",
+  ].join("\n");
+  const tokens = tokenize(new TSX(), code);
+
+  assertToken(tokens, "<Select", "jsx-tag");
+  assertToken(tokens, "string", "type");
+  assertToken(tokens, "render", "attribute");
+  assertToken(tokens, "<Item", "jsx-tag");
+  assertToken(tokens, "id", "type");
+  assertToken(tokens, "/>", "tag-selfclose");
+  assert.ok(tokens.some((token) => token.type === "type-separator" && token.value === "<"));
+  assert.ok(tokens.some((token) => token.type === "type-separator" && token.value === ">"));
+});
+
 test("TSX types arrow parameters and keeps JSX expressions typed", () => {
   const code = "const App = (title: Props) => (<div>{title as string}</div>);";
   const tokens = tokenize(new TSX(), code);
@@ -195,6 +216,52 @@ test("Markdown dispatches fenced code to embedded languages", () => {
     ["```text", "plain content", "```"].join("\n"),
   );
   assertToken(plain, "plain content", "code-block");
+});
+
+test("Markdown fences open in blockquotes and list items", () => {
+  const quoted = tokenize(
+    new Markdown(),
+    [
+      "> ```ts",
+      "> const value: number = 1;",
+      "> ```",
+    ].join("\n"),
+  );
+  assertToken(quoted, "```ts", "code-fence");
+  assertToken(quoted, "> ", "blockquote");
+  assertToken(quoted, "const", "keyword");
+  assertToken(quoted, "number", "type");
+  assert.ok(quoted.some((token) => token.type === "code-fence-end"));
+
+  const listed = tokenize(
+    new Markdown(),
+    [
+      "- item",
+      "- ```js",
+      "  const value = 1;",
+      "  ```",
+    ].join("\n"),
+  );
+  assertToken(listed, "```js", "code-fence");
+  assertToken(listed, "const", "keyword");
+  assert.ok(listed.some((token) => token.type === "code-fence-end"));
+
+  const notQuoted = tokenize(
+    new Markdown(),
+    ["```js", "> const value = 1;", "```"].join("\n"),
+  );
+  assert.equal(
+    notQuoted.some((token) => token.type === "blockquote"),
+    false,
+    "a non-quoted fence must not strip a leading > from code",
+  );
+  assertToken(notQuoted, ">", "operator");
+
+  const notFence = tokenize(
+    new Markdown(),
+    ["text ```js", "still text"].join("\n"),
+  );
+  assert.equal(notFence.some((token) => token.type === "code-fence"), false);
 });
 
 test("embedded fences close even from an open language state", () => {

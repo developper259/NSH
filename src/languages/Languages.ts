@@ -21,6 +21,7 @@ import { SQL } from './SQL';
 import { Rust } from './Rust';
 import { Go } from './Go';
 import { SCSS } from './SCSS';
+import { Sass } from './Sass';
 
 export const languages: Record<string, LanguageDefinition> = {
   javascript: new JavaScript(),
@@ -44,6 +45,7 @@ export const languages: Record<string, LanguageDefinition> = {
   rust: new Rust(),
   go: new Go(),
   scss: new SCSS(),
+  sass: new Sass(),
 };
 
 export const defaultRegistry = new LanguageRegistry();

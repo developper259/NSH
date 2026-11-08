@@ -35,7 +35,10 @@ assert.ok(htmlText.result.length >= 1, "HTML text was not tokenized");
 
 const cssDocument = measure(() => {
   const lines = Array.from({ length: 5000 }, () => "{").join("\n");
-  return new IncrementalDocument(new Tokenizer(new CSS()), lines);
+  return new IncrementalDocument(
+    new Tokenizer(new CSS(), { onStateDepthExceeded: "truncate" }),
+    lines,
+  );
 });
 assert.ok(
   cssDocument.result.getLine(4999).stateAfter.length <= 64,
