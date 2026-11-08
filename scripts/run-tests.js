@@ -14,8 +14,14 @@ if (files.length === 0) {
   process.exit(1);
 }
 
-const result = spawnSync(process.execPath, ["--test", ...files], {
-  cwd: root,
-  stdio: "inherit",
-});
+// Test files run sequentially: packaging tests spawn npm and may rebuild dist,
+// so running them concurrently with tests that spawn Workers is racy.
+const result = spawnSync(
+  process.execPath,
+  ["--test", "--test-concurrency=1", ...files],
+  {
+    cwd: root,
+    stdio: "inherit",
+  },
+);
 process.exit(result.status ?? 1);

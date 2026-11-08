@@ -7,10 +7,11 @@ const test = require("node:test");
 
 const ROOT = path.join(__dirname, "..");
 
-function run(command, args, cwd) {
+function run(command, args, cwd, env = process.env) {
   try {
     return execFileSync(command, args, {
       cwd,
+      env,
       encoding: "utf8",
       stdio: ["ignore", "pipe", "pipe"],
       shell: process.platform === "win32" && command === "npm",
@@ -28,7 +29,12 @@ test("npm pack + install in a temp project exposes CJS, ESM, types and themes", 
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "nsh-package-"));
   let tarball;
   try {
-    const packOutput = run("npm", ["pack", "--json", "--ignore-scripts"], ROOT);
+    const packOutput = run(
+      "npm",
+      ["pack", "--json", "--ignore-scripts"],
+      ROOT,
+      { ...process.env, npm_config_ignore_scripts: "true" },
+    );
     const packInfo = JSON.parse(packOutput);
     tarball = path.join(ROOT, packInfo[0].filename);
     assert.ok(fs.existsSync(tarball), "tarball was not created");
